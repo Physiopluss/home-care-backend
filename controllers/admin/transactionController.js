@@ -143,7 +143,7 @@ exports.getPhysioWithdrawalRequestByDate = async (req, res) => {
             });
         }
         // if check physio
-        const physio = await Physio.findOne({ _id: physioId });
+        const physio = await Physio.findOne({ _id: physioId, });
         if (!physio) {
             return res.status(404).json({
                 message: 'Physio not found',
@@ -171,6 +171,19 @@ exports.getPhysioWithdrawalRequestByDate = async (req, res) => {
             error: error.message
         })
     }
+}
+
+exports.updateWithdrawStatus = async (req, res) => {
+
+    try {
+
+        console.log(req.body);
+
+
+    } catch (error) {
+
+    }
+
 }
 
 // Approve physio withdrawal request

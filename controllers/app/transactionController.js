@@ -1,6 +1,7 @@
 const Transaction = require('../../models/transaction')
 const Patient = require('../../models/patient')
 const Appointment = require('../../models/appointment')
+const invoice = require('../../models/invoice')
 
 
 // Get Patient Transaction
@@ -57,3 +58,48 @@ exports.getPatientTransactions = async (req, res) => {
     })
   }
 };
+
+exports.getInvoice = async (req, res) => {
+  try {
+    const { appointmentId, appointmentStatus = 0 } = req.query;
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        message: 'appointmentId  is required',
+        status: 400,
+      });
+    }
+
+    const appointment = await Appointment.findById(appointmentId)
+
+    if (appointment) {
+      const invoices = await invoice.findOne(
+        {
+          appointmentId: appointmentId,
+          type: appointmentStatus === 0 ? "appointment" : "treatment"
+
+        })
+      return res.status(200).json({
+        message: 'Invoices fetched',
+        success: true,
+        status: 200,
+        data: invoices
+      });
+
+    }
+
+    return res.status(400).json({
+      message: 'appointment not found',
+      success: false,
+      status: 400,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Something went wrong, please try again',
+      status: 500,
+      success: false,
+      error: error.message
+    })
+  }
+}

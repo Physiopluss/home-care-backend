@@ -14,6 +14,7 @@ const sendAppointmentEmail = require('../../services/sendEmail');
 const { GiveCashBack, CashBackCacheKey } = require('../../utility/cashBackUtility');
 const { redisClient } = require('../../utility/redisClient');
 const CashBack = require('../../models/cashBack');
+const moment = require('moment')
 
 var instance = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -606,23 +607,6 @@ exports.createAppointmentRazorpay = async (req, res) => {
             },
             { new: true }
         );
-
-
-        const chats = await Chat.find({
-            patientId,
-            physioId
-        })
-
-        if (chats.length === 0) {
-            const chat = new Chat({
-                patientId,
-                physioId
-            })
-            await chat.save()
-        }
-        else {
-            console.log("already chats created ");
-        }
 
         return res.status(200).json({
             message: 'Appointment created',

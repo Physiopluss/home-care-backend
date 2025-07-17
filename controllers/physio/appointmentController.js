@@ -68,7 +68,7 @@ exports.getPhysioAppointments = async (req, res) => {
         }
 
         console.log(req.query);
-        
+
         // Special case when appointmentStatus is 25
         // if (appointmentStatus == 25) {
         //     const appointments = await Appointment.find({
@@ -1164,7 +1164,7 @@ exports.treatmentSchedule = async (req, res) => {
 
         // Save treatment data
         appointment.isTreatmentScheduled = {
-            isTreatmentRequest : true,
+            isTreatmentRequest: true,
             treatmentDate: treatmentEntries,
             startTime: startTime,
             endTime: endTime,
@@ -1242,25 +1242,25 @@ exports.reScheduleTreatment = async (req, res) => {
 
 
     try {
-    const { appointmentId, treatmentIds, updatedDates } = req.body;
+        const { appointmentId, treatmentIds, updatedDates } = req.body;
 
-    if (!Array.isArray(treatmentIds) || !Array.isArray(updatedDates)) {
-        return res.status(400).json({
-            message: "Please provide proper arrays of treatmentIds and updatedDates.",
-            status: 400,
-            success: false
-        });
-    }
+        if (!Array.isArray(treatmentIds) || !Array.isArray(updatedDates)) {
+            return res.status(400).json({
+                message: "Please provide proper arrays of treatmentIds and updatedDates.",
+                status: 400,
+                success: false
+            });
+        }
 
-    if (!appointmentId || treatmentIds.length !== updatedDates.length) {
-        return res.status(402).json({
-            message: "appointmentId, treatmentIds, and updatedDates are required and must be of equal length.",
-            status: 402,
-            success: false
-        });
-    }
+        if (!appointmentId || treatmentIds.length !== updatedDates.length) {
+            return res.status(402).json({
+                message: "appointmentId, treatmentIds, and updatedDates are required and must be of equal length.",
+                status: 402,
+                success: false
+            });
+        }
 
-    const updatedDateResult = [];
+        const updatedDateResult = [];
 
         const checkAppointment = await Appointment.findById(appointmentId);
 
@@ -1391,7 +1391,11 @@ exports.singleAppointment = async (req, res) => {
                     {
                         path: 'degree.degreeId',
                         model: 'Degree'
-                    }
+                    },
+                    {
+                        path: 'subscriptionId',
+                        model: 'Subscription'
+                    },
                 ]
             });
         if (!appointment) {

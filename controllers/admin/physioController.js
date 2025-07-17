@@ -17,7 +17,8 @@ const notification = require('../../models/notification');
 const { redisClient, CACHE_EXPIRATION } = require('../../utility/redisClient');
 const { deleteFileFromS3 } = require('../../services/awsService');
 const invoice = require('../../models/invoice');
-
+const Review = require('../../models/review');
+const Plan = require('../../models/plan');
 // Set The Storage Engine
 const storage = multer.diskStorage({
     // destination: (req, file, cb) => {
@@ -3482,6 +3483,7 @@ exports.purgePhysio = async (req, res) => {
             Subscription.deleteMany({ physioId }),
             // Appointment.deleteMany({ physioId }),
             // Chat.deleteMany({ $or: [{ senderId: physioId }, { receiverId: physioId }] }),
+        
             Review.deleteMany({ physioId }),
             notification.deleteMany({ physioId }),
             Plan.deleteMany({ physioId }),

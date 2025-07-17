@@ -9,7 +9,7 @@ router.get('/getPhystiWithdrawalRequest', transactionController.getPhystiWithdra
 // physio transaction
 router.get('/getPhysioOnlineTransaction', transactionController.getPhysioOnlineTransaction);
 router.get('/getPhysioWithdrawalRequestByDate', transactionController.getPhysioWithdrawalRequestByDate);
-
+router.put('/updateWithdrawStatus',transactionController.updateWithdrawStatus)
 // 
 router.post("/approvePhysioWithdrawalRequest", transactionController.approvePhysioWithdrawalRequest);
 

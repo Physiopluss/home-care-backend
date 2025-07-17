@@ -436,17 +436,6 @@ exports.createAppointmentRazorpay = async (req, res) => {
             physioId
         })
 
-        if (chats.length === 0) {
-            const chat = new Chat({
-                patientId,
-                physioId
-            })
-            await chat.save()
-        }
-        else {
-            console.log("already chats created ");
-        }
-
         if (patient) {
             // Update the patient document with the new appointment address
             if (patient.appointmentAddress !== appointmentAddress.toString()) {

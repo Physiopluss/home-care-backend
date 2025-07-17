@@ -90,16 +90,25 @@ exports.PhysioWalletWithdrawTransactions = async (req, res) => {
 			status: 400
 		});
 
+
+		// Calculate Total Revenue using derived formula
+		const totalRevenue = amount / 0.76;
+		const platformEarning = totalRevenue * 0.22;
+		const gst = platformEarning * 0.18;
+
 		// transaction details
 		const transaction = new Transaction({
 			physioId: physioId,
-			amount: amount,
+			amount: totalRevenue,
 			wallet: amount,
 			physioTransactionType: "withdraw",
 			transactionId: `PHWID_${generateRandomCode()}`,
 			paymentMode: 'wallet',
 			paymentStatus: 'pending',
 			paidTo: "physioPlus",
+			gstAmount: gst,
+			physioAmount: amount,
+			physioPlusAmount: platformEarning
 		});
 		await transaction.save();
 

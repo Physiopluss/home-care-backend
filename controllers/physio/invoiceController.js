@@ -4,7 +4,7 @@ const Invoice = require('../../models/invoice');
 
 exports.getInvoice = async (req, res) => {
     try {
-        const { physioId, patientId, appointmentId, isTreatment } = req.query;
+        const { appointmentId, appointmentStatus = 0 } = req.query;
 
         if (!appointmentId) {
             return res.status(400).json({
@@ -13,16 +13,12 @@ exports.getInvoice = async (req, res) => {
             });
         }
 
-        const app  =  await invoice.findOne(
+        const invoices = await invoice.findOne(
             {
-                appointmentId : appointmentId,
-                
-
+                appointmentId: appointmentId,
+                type: appointmentStatus === 0 ? "appointment" : "treatment"
 
             })
-
-
-
         return res.status(200).json({
             message: 'Invoices fetched',
             success: true,

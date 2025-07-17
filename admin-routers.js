@@ -13,6 +13,7 @@ const physioProfileEdit = require('./routes/admin/physioProfileEdit');
 const invoice = require('./routes/admin/invoice');
 const summary = require('./routes/admin/summary');
 const notification = require('./routes/admin/notification');
+const plan = require('./routes/admin/plan')
 
 const AppRouter = (app) => {
     app.use('/api/admin/summary', summary);
@@ -25,7 +26,7 @@ const AppRouter = (app) => {
     app.use('/api/admin/degree', degree)
     app.use('/api/admin/subspecialization', subspecialization);
     app.use('/api/admin/transaction', transaction);
-    // app.use('/api/admin/event', event);
+    app.use('/api/admin/plan',plan);
     app.use('/api/admin/help_Support', help_Support);;
     app.use('/api/admin/physioProfileEdit', physioProfileEdit);
     app.use('/api/admin/invoice', invoice);
