@@ -7,9 +7,11 @@ router.get('/getPhysioWithdrawalRequest', transactionController.getPhysioWithdra
 router.get('/getPhystiWithdrawalRequest', transactionController.getPhystiWithdrawalRequest);
 
 // physio transaction
-router.get('/getPhysioOnlineTransaction', transactionController.getPhysioOnlineTransaction);
+router.get('/getPhysioOnlineTransactions', transactionController.getPhysioOnlineTransaction);
+router.get('/getPhysioCashTransactions', transactionController.getPhysioCashTransaction);
 router.get('/getPhysioWithdrawalRequestByDate', transactionController.getPhysioWithdrawalRequestByDate);
 router.put('/updateWithdrawStatus',transactionController.updateWithdrawStatus)
+router.get('/payToPhysioPlusHistory',transactionController.payToPhysioPlusHistory)
 // 
 router.post("/approvePhysioWithdrawalRequest", transactionController.approvePhysioWithdrawalRequest);
 router.get("/getPatientTransaction", transactionController.getPatientTransaction);

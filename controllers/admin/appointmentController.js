@@ -887,7 +887,7 @@ exports.getAllTreatmentRequestsData = async (req, res) => {
         const treatments = await Appointment.find({
             appointmentStatus: 1,
             'isTreatmentScheduled.isTreatmentRequest': true
-        }).populate('physioId patientId');
+        }).populate('physioId patientId').sort({'createdAt':-1});
         if (treatments) {
             return res.status(200).json({
                 message: "Treatments fetched successfully",

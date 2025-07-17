@@ -131,6 +131,42 @@ exports.getPhysioOnlineTransaction = async (req, res) => {
         })
     }
 }
+exports.getPhysioCashTransaction = async (req, res) => {
+    try {
+        let physioId = req.query.physioId;
+        if (!physioId) {
+            return res.status(400).json({
+                message: 'PhysioId is required',
+                success: false,
+                status: 400
+            });
+        }
+
+
+        const transactions = await Transaction.find({
+            paymentMode: "cash",
+        }).populate('patientId physioId couponId').populate({
+            path: 'couponId',
+            select: 'couponName couponCode discount status couponPlace'
+        })
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            message: 'Transactions fetched',
+            status: 200,
+            success: true,
+            data: transactions
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: 'Something went wrong Please try again',
+            status: 500,
+            success: false,
+            error: error.message
+        })
+    }
+}
 
 // get physio withdrawal request
 exports.getPhysioWithdrawalRequestByDate = async (req, res) => {
@@ -259,6 +295,43 @@ exports.updateWithdrawStatus = async (req, res) => {
             success: false,
             status: 500,
             error: error.message || error
+        });
+    }
+};
+
+exports.payToPhysioPlusHistory = async (req, res) => {
+    try {
+
+        const { physioId } = req.query;
+
+        if (!physioId) return res.status(400).json({
+            message: 'PhysioId is required',
+            success: false,
+            status: 400
+        });
+        const physio = await Physio.findById({ _id: physioId });
+        if (!physio) return res.status(400).json({
+            message: 'Physio not found',
+            success: false,
+            status: 400
+        });
+        const transactions = await Transaction.find({
+            physioId,
+            paidTo: 'physioPlus',
+            paidFor: "debt"
+        }).populate('physioId');
+        return res.status(200).json({
+            message: 'Transactions fetched',
+            success: true,
+            status: 200,
+            data: transactions
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: 'Server Error',
+            success: false,
+            status: 500
         });
     }
 };
