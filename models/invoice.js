@@ -29,7 +29,7 @@ const invoiceSchema = mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["appointment", "treatment", "subscription", "other"],
+            enum: ["appointment", "treatment", "subscription", "withdraw","other"],
             default: null
         },
         amount: {

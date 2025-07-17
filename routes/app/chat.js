@@ -7,7 +7,6 @@ router.post('/create/chat', chatController.createChatRoom)
 router.post('/get/chat', chatController.getChatRoom)
 router.get('/get/chat/patient', chatController.getChatePatientByPhysio)
 router.get('/get/chat/room', chatController.getChatByPhysio)
-router.get('/get-unread-notification', chatController.getUnreadnotification)
-router.get('/UnreadNotificationUpdate', chatController.getUnreadnotificationUpdate)
+
 module.exports = router;
 

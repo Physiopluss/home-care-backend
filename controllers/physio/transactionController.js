@@ -182,6 +182,42 @@ exports.getWithdrawHistory = async (req, res) => {
 	}
 };
 
+exports.payToPhysioPlusHistory = async (req, res) => {
+	try {
+
+		const { physioId } = req.query;
+
+		if (!physioId) return res.status(400).json({
+			message: 'PhysioId is required',
+			success: false,
+			status: 400
+		});
+		const physio = await Physio.findById({ _id: physioId });
+		if (!physio) return res.status(400).json({
+			message: 'Physio not found',
+			success: false,
+			status: 400
+		});
+		const transactions = await Transaction.find({
+			physioId,
+			paidTo: 'physioPlus',
+			paidFor: "debt"
+		}).populate('physioId');
+		return res.status(200).json({
+			message: 'Transactions fetched',
+			success: true,
+			status: 200,
+			data: transactions
+		});
+	} catch (error) {
+		console.log(error);
+		return res.status(500).json({
+			message: 'Server Error',
+			success: false,
+			status: 500
+		});
+	}
+};
 exports.payToPhysioPlus = async (req, res) => {
 	try {
 		// {physioId , amount} = req.body

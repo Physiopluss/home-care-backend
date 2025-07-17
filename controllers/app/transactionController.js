@@ -62,6 +62,8 @@ exports.getPatientTransactions = async (req, res) => {
 exports.getInvoice = async (req, res) => {
   try {
     const { appointmentId, appointmentStatus = 0 } = req.query;
+    console.log(req.query);
+
 
     if (!appointmentId) {
       return res.status(400).json({
@@ -76,7 +78,7 @@ exports.getInvoice = async (req, res) => {
       const invoices = await invoice.findOne(
         {
           appointmentId: appointmentId,
-          type: appointmentStatus === 0 ? "appointment" : "treatment"
+          type: appointmentStatus === 0 || '0' ? "appointment" : "treatment"
 
         })
       return res.status(200).json({

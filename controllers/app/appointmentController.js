@@ -788,7 +788,7 @@ exports.verifyRazorpayPayment = async (req, res) => {
             platformCharges: platformCharges,
             gstAmount: gst,
             physioPlusAmount: platformCharges,
-            physioAmount: (amount - (platformCharges + gst)),
+            physioAmount: (payment.amount - (platformCharges + gst)),
         });
         appointment.transactionId = transaction._id;
         await appointment.save();
@@ -815,16 +815,6 @@ exports.verifyRazorpayPayment = async (req, res) => {
         sendAppointmentEmail({ data: emailData }).catch(e => console.error("Error sending email:", e));
 
         // Unapprove physio if appointment count is >= 4 and plan type is free
-        const appointmentCount = await Appointment.countDocuments({ physioId: physio._id });
-        if (appointmentCount >= 4 && planType === 0) {
-            await Physio.findByIdAndUpdate(
-                physio._id,
-                {
-                    accountStatus: 0,
-                },
-                { new: true }
-            );
-        }
 
     } catch (error) {
         console.error(error);

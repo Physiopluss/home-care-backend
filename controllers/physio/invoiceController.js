@@ -4,7 +4,7 @@ const Invoice = require('../../models/invoice');
 
 exports.getInvoice = async (req, res) => {
     try {
-        const { appointmentId, appointmentStatus = 0 } = req.query;
+        const { appointmentId, appointmentStatus =0 } = req.query;
 
         if (!appointmentId) {
             return res.status(400).json({
@@ -12,11 +12,13 @@ exports.getInvoice = async (req, res) => {
                 status: 400,
             });
         }
+        console.log(req.query);
+        
 
         const invoices = await invoice.findOne(
             {
                 appointmentId: appointmentId,
-                type: appointmentStatus === 0 ? "appointment" : "treatment"
+                type: appointmentStatus === 0 || "0" ? "appointment" : "treatment"
 
             })
         return res.status(200).json({

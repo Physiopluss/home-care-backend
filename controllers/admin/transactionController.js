@@ -5,6 +5,8 @@ const PhysioHelper = require('../../utility/physioHelper');
 const sendNotification = require('../../app');
 const { sendFCMNotification } = require('../../services/fcmService');
 const appointment = require('../../models/appointment');
+const { createAppointmentInvoice } = require('../app/appointmentController');
+const invoice = require('../../models/invoice');
 
 // Get Withdrawal Request
 exports.getPhysioWithdrawalRequest = async (req, res) => {
@@ -173,18 +175,94 @@ exports.getPhysioWithdrawalRequestByDate = async (req, res) => {
     }
 }
 
-exports.updateWithdrawStatus = async (req, res) => {
-
+exports.withdrawalInvoice = async (req, res) => {
     try {
+        const { id } = req.query;
 
-        console.log(req.body);
+        if (!id) {
+            return res.status(400).json({
+                message: 'id is required',
+                success: false,
+                status: 400
+            });
+        }
+        // if check physio
+        const Invoice = await invoice.findOne({
+            transactionId: id,
 
+        }).populate('physioId  transactionId');
+        if (!Invoice) {
+            return res.status(404).json({
+                message: 'invoice not found',
+                success: false,
+                status: 404
+            });
+        }
+        res.status(200).json({
+            message: 'Transactions fetched',
+            status: 200,
+            success: true,
+            data: Invoice
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: 'Something went wrong Please try again',
+            status: 500,
+            success: false,
+            error: error.message
+        })
+    }
+}
+
+exports.updateWithdrawStatus = async (req, res) => {
+    try {
+        const { id, status } = req.body;
+        const paymentStatus = status === "Rejected" ? "failed" : (status === "Completed" ? "paid" : "pending");
+
+        const txn = await Transaction.findById(id);
+        if (!txn) {
+            return res.status(400).json({
+                message: 'Transaction not found',
+                success: false,
+                status: 400,
+            });
+        }
+
+        txn.paymentStatus = paymentStatus;
+
+        let newInvoice = null;
+        if (status === "Completed") {
+            newInvoice = new invoice({
+                appointmentId: txn.appointmentId,  // FIXED: pulled from txn
+                type: "withdraw",
+                transactionId: txn._id,
+                physioId: txn.physioId,
+                amount: txn.amount,
+                paymentMode: txn.paymentMode
+            });
+
+            await newInvoice.save();  // only save if it was created
+        }
+
+        await txn.save();
+
+        return res.status(200).json({
+            message: 'Status updated',
+            success: true,
+            data: newInvoice,
+            status: 200,
+        });
 
     } catch (error) {
-
+        return res.status(500).json({
+            message: 'Internal Server Error',
+            success: false,
+            status: 500,
+            error: error.message || error
+        });
     }
+};
 
-}
 
 // Approve physio withdrawal request
 exports.approvePhysioWithdrawalRequest = async (req, res) => {
@@ -298,6 +376,7 @@ exports.getPatientTransaction = async (req, res) => {
         })
     }
 }
+
 
 // physioAmount Transaction
 exports.physioRevenue = async (req, res) => {

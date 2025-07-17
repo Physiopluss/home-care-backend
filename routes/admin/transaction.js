@@ -12,9 +12,8 @@ router.get('/getPhysioWithdrawalRequestByDate', transactionController.getPhysioW
 router.put('/updateWithdrawStatus',transactionController.updateWithdrawStatus)
 // 
 router.post("/approvePhysioWithdrawalRequest", transactionController.approvePhysioWithdrawalRequest);
-
 router.get("/getPatientTransaction", transactionController.getPatientTransaction);
-
+router.get("/withdrawal-invoice", transactionController.withdrawalInvoice);
 router.get("/getPatientTransactionByDate", transactionController.physioRevenue)
 
 module.exports = router;

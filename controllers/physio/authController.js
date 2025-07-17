@@ -1212,7 +1212,7 @@ exports.getPhysioById = async (req, res) => {
         return res.status(500).json({
 
             status: false,
-            message: "Error fetching physio"+error,
+            message: "Error fetching physio" + error,
             status: 500
         });
     }
@@ -2281,6 +2281,94 @@ exports.verifyPlanUpgrade = async (req, res) => {
     }
 }
 
+exports.physioRevenue = async (req, res) => {
+    try {
+        const { physioId } = req.query;
+        if (!physioId) {
+            return res.status(400).json({
+                data: req.query,
+                dat: req.params,
+                message: "Required physioId",
+                status: 400,
+                success: false
+            });
+        }
+
+        const physio = await Physio.findById(physioId);
+        if (!physio) {
+            return res.status(404).json({
+                message: "Physio not found",
+                status: 404,
+                success: false,
+            });
+        }
+
+        const transactions = await Transaction.find({
+            physioId: physioId,
+            physioTransactionType: { $in: ["credit", "debit", "withdraw"] },
+            paidFor: { $in: ['appointment', 'treatment'] },
+        })
+
+        const [totalAppointment, totalTreatment] = await Promise.all([
+            Appointment.find({ physioId: physioId, appointmentStatus: 0 }).countDocuments(),
+            Appointment.find({ physioId: physioId, appointmentStatus: 1 }).countDocuments()
+        ])
+
+        let consultationAmt = 0;
+        let treatmentAmt = 0;
+        let cashAmount = 0
+        let cashPlatFormCharges = 0
+        let onlineAmount = 0;
+        let payToPhysioPlusTxnAmt = 0;
+        transactions.map(txn => {
+
+
+            if (txn.paidTo === "physioPlus" && txn.paidFor === "debt") {
+                payToPhysioPlusTxnAmt += txn.amount
+            }
+
+            if (txn.paymentMode === 'online') {
+                onlineAmount += txn.physioAmount
+            }
+            else if (txn.paymentMode === 'cash') {
+                cashAmount += txn.physioAmount
+                cashPlatFormCharges += txn.platformCharges + txn.gstAmount
+            }
+            if (txn.paidFor === "appointment") {
+                consultationAmt += txn.physioAmount
+            }
+            else if (txn.paidFor === "treatment") {
+                treatmentAmt += txn.physioAmount
+            }
+        })
+
+        return res.status(200).json({
+            message: "physio Revenue",
+            status: 200,
+            success: true,
+            data: {
+                totalRevenue: (consultationAmt + treatmentAmt),
+                consultationAmt,
+                treatmentAmt,
+                cashPlatFormCharges: (cashPlatFormCharges - payToPhysioPlusTxnAmt),
+                onlineAmount,
+                cashAmount,
+                totalAppointment,
+                totalTreatment,
+                physioWalletAmt: physio?.wallet
+
+            },
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: "Something went wrong",
+            status: 500,
+            success: false
+        });
+    }
+}
 
 // physio Add wallet amount
 exports.addWalletAmount = async (req, res) => {
@@ -2335,8 +2423,6 @@ exports.addWalletAmount = async (req, res) => {
 
         const payment = await instance.orders.create(options);
 
-        console.log(payment, 'created');
-
         return res.status(201).json({
             message: "Wallet amount added successfully",
             status: 201,
@@ -2353,92 +2439,6 @@ exports.addWalletAmount = async (req, res) => {
         });
     }
 }
-
-exports.physioRevenue = async (req, res) => {
-    try {
-        const { physioId } = req.query;
-        console.log(req.query);
-        console.log(req.query);
-
-
-        console.log(req.body, "body");
-        if (!physioId) {
-            return res.status(400).json({
-                data: req.query,
-                dat: req.params,
-                message: "Required physioId",
-                status: 400,
-                success: false
-            });
-        }
-
-        const physio = await Physio.findById(physioId);
-        if (!physio) {
-            return res.status(404).json({
-                message: "Physio not found",
-                status: 404,
-                success: false,
-            });
-        }
-
-        const transactions = await Transaction.find({
-            physioId: physioId,
-            physioTransactionType: { $in: ["credit", "debit", "withdraw"] },
-            paidFor: { $in: ['appointment', 'treatment'] },
-        })
-
-        const [totalAppointment, totalTreatment] = await Promise.all([
-            Appointment.find({ physioId: physioId, appointmentStatus: 0 }).countDocuments(),
-            Appointment.find({ physioId: physioId, appointmentStatus: 1 }).countDocuments()
-        ])
-
-        let consultationAmt = 0;
-        let treatmentAmt = 0;
-        let cashAmount = 0
-        let onlineAmount = 0;
-        transactions.map(txn => {
-
-            if (txn.paymentMode === 'online') {
-                onlineAmount += txn.physioAmount
-            }
-            else if (txn.paymentMode === 'cash') {
-                cashAmount += txn.physioAmount
-            }
-            if (txn.paidFor === "appointment") {
-                consultationAmt += txn.physioAmount
-            }
-            else if (txn.paidFor === "treatment") {
-                treatmentAmt += txn.physioAmount
-            }
-        })
-
-        return res.status(200).json({
-            message: "physio Revenue",
-            status: 200,
-            success: true,
-            data: {
-                totalRevenue: (consultationAmt + treatmentAmt),
-                consultationAmt,
-                treatmentAmt,
-                onlineAmount,
-                cashAmount,
-                totalAppointment,
-                totalTreatment,
-                physioWalletAmt: physio?.wallet
-
-            },
-        });
-
-    } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Something went wrong",
-            status: 500,
-            success: false
-        });
-    }
-}
-
 // physio get wallet amount
 exports.VerifyWalletAmount = async (req, res) => {
     try {

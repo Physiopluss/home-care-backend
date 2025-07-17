@@ -131,6 +131,88 @@ exports.AddReview = async (req, res) => {
 };
 
 
+// This funtion is getting unreadNotifications in patient site
+exports.getUnreadNotification = async (req, res) => {
+  try {
+    const { patientId } = req.query;
+
+    // Validate patientId
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: "patientId is required"
+      });
+    }
+
+    // Check if patient exists
+    const patient = await Patient.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found"
+      });
+    }
+
+    // Get unread notifications
+    const unreadNotifications = await Notification.find({
+      patientId,
+      isRead: false,
+      from: { $in: ["admin", "physio"] },
+      to: "patient"
+    }).populate("physioId patientId");
+
+    return res.status(200).json({
+      success: true,
+      message: "Unread notifications fetched successfully",
+      data: unreadNotifications
+    });
+
+  } catch (error) {
+    console.error("Error fetching unread notifications:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message || error
+    });
+  }
+};
+
+
+// update notifications from patinet side 
+exports.getUnreadNotificationUpdate = async (req, res) => {
+  try {
+    const { patientId } = req.query;
+
+    if (!patientId) {
+      return res.status(400).json({ success: false, message: "patientId is required" });
+    }
+
+    const result = await Notification.updateMany(
+      {
+        patientId,
+        to: "patient",
+        from: { $in: ["admin", "physio"] },
+        isRead: false,
+      },
+      {
+        $set: { isRead: true },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Notifications marked as read",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message || error,
+    });
+  }
+};
+
 // give physio like and dislike
 exports.likePatientByPhysio = async (req, res) => {
   try {

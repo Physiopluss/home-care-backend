@@ -373,8 +373,7 @@ exports.completeAppointment = async (req, res) => {
             }
 
             // Generate invoice and send chat message
-            const invoice = await createAppointmentInvoice(appointmentId);
-            await sendChatMessage(physio._id, patient._id, invoice);
+            await createAppointmentInvoice(appointmentId);
 
             return res.status(200).json({
                 message: 'Appointment Completed',
