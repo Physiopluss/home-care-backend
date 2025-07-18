@@ -1,4 +1,3 @@
-const admin = require('./routes/admin/auth');
 const appointment = require('./routes/admin/appointment');
 const coupon = require('./routes/admin/coupon');
 const specialization = require('./routes/admin/specialization');
