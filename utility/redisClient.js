@@ -147,7 +147,7 @@ const watchPhysioConnectCollection = async () => {
 
         if (change.operationType === 'update') {
             const updatedFields = Object.keys(change.updateDescription?.updatedFields || {});
-            const watchFields = ['fullName', 'profileImage', 'phone', 'workExperience', 'serviceType', 'isDeleted', 'isPhysioConnect', 'isPhysioConnectPaid', 'isPhysioConnectPaidDate', 'isPhysioConnectPayment', 'isPhysioConnectProfileCompleted', 'isPhysioConnectTransferred'];
+            const watchFields = ['fullName', 'profileImage', 'phone', 'workExperience', 'serviceType', 'isDeleted', 'isPhysioConnect', 'isPhysioConnectPaid', 'isPhysioConnectPaidDate', 'isPhysioConnectPayment', 'isPhysioConnectProfileCompleted', 'isPhysioConnectTransferred', 'accountStatus'];
 
             if (updatedFields.some(field => watchFields.includes(field))) {
                 await deleteRedisKeys(pattern);

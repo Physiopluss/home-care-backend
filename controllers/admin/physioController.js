@@ -110,15 +110,14 @@ exports.AllPhysio = async (req, res) => {
             cache = false
         } = req.query;
 
+        console.log(req.query);
+
         const currentPage = parseInt(page);
         const limit = parseInt(perPage);
         const skip = (currentPage - 1) * limit;
 
         let query = {
             isDeleted: false, isBlocked: false
-            , $nor: [
-                { isPhysioConnect: true, isPhysioConnectTransferred: false }
-            ]
         };
 
         if (name) {
@@ -130,43 +129,12 @@ exports.AllPhysio = async (req, res) => {
             ]
         }
 
-        if (onboardedFrom) {
-
-
-            query.onboardedFrom = onboardedFrom.toLowerCase();
-        }
-
         if (date) {
             const startOfDayIST = moment.tz(date, 'Asia/Kolkata').startOf('day');
             const endOfDayIST = moment.tz(date, 'Asia/Kolkata').endOf('day');
             const startUTC = new Date(startOfDayIST.toISOString());
             const endUTC = new Date(endOfDayIST.toISOString());
             query.createdAt = { $gte: startUTC, $lte: endUTC };
-        }
-
-        let planTypeMatch = {};
-        if (planType == 0) {
-            planTypeMatch = {
-                $or: [
-                    { 'plan.planType': { $eq: 0 } },
-                    { 'plan.planType': { $exists: false } }
-                ]
-            };
-        } else if (planType == 1) {
-            planTypeMatch = { 'plan.planType': { $eq: 1 } };
-        } else if (planType == 2) {
-            planTypeMatch = { 'plan.planType': { $eq: 2 } };
-        }
-
-        if (freePhysio) {
-            if (freePhysio === 'approved') query.accountStatus = 1
-            else if (freePhysio === 'unApproved') query.accountStatus = 0
-            else {
-                planTypeMatch = {
-                    'subscription.patientCount': { $gte: 4 },
-                    'plan.planType': { $eq: 0 }
-                };
-            }
         }
 
         // Caching logic
@@ -220,7 +188,6 @@ exports.AllPhysio = async (req, res) => {
                     preserveNullAndEmptyArrays: true
                 }
             },
-            { $match: planTypeMatch },
             {
                 $facet: {
                     data: [
@@ -3483,7 +3450,7 @@ exports.purgePhysio = async (req, res) => {
             Subscription.deleteMany({ physioId }),
             // Appointment.deleteMany({ physioId }),
             // Chat.deleteMany({ $or: [{ senderId: physioId }, { receiverId: physioId }] }),
-        
+
             Review.deleteMany({ physioId }),
             notification.deleteMany({ physioId }),
             Plan.deleteMany({ physioId }),

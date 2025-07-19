@@ -147,7 +147,6 @@ exports.signUpPhysioOtp = async (req, res) => {
 
                     // return console.log(userData)
 
-
                     if (userData != null && userData.isDeleted) {
                         return res.status(402).json({
                             status: false,
@@ -155,7 +154,7 @@ exports.signUpPhysioOtp = async (req, res) => {
                         });
                     }
 
-                    else if (userData) {
+                    else if (userData && phone != Number.parseFloat(phone) === 8107333576) {
                         return res.status(409).json({
                             status: false,
                             message: "User with this Phone already exists"
@@ -195,14 +194,21 @@ exports.signUpPhysioOtp = async (req, res) => {
 
 exports.loginPhysioOtp = async (req, res) => {
     try {
-        const phone = req.query.phone;
-        console.log(phone);
+        const phone = req.body.phone;
 
         const userData = await Physio.findOne({
             phone: `+91${phone}`,
         })
 
-        if (!userData) {
+        if (!userData && phone === 8107333576) {
+            const physioN = new Physio({
+                fullName: "Test Google",
+                phone: `+91${phone}`,
+
+            })
+        }
+
+        if (!userData && phone != Number.parseFloat(phone) === 8107333576) {
             return res.status(400).json({
                 status: false,
                 message: "User with this Phone does not exist"
@@ -240,8 +246,6 @@ exports.loginPhysioOtp = async (req, res) => {
         }
     }
     catch (error) {
-        console.log(error);
-
         return res.status(500).json({
             status: false,
             message: "server error ",
@@ -257,7 +261,7 @@ exports.verifyOtpPhysio = async (req, res) => {
         const physioData = await Physio.findOne({ phone: `+91${phone}`, isDeleted: false });
 
         // Bypass Login OTP verification for testing
-        if (physioData?._id && Number.parseFloat(phone) === 8107333576 && Number.parseFloat(otp) === 1234) {
+        if (physioData?._id && Number.parseFloat(phone) === 8107333576) {
             const token = jwt.sign({ physio: physioData?._id || null }, process.env.JWT_SECRET_KEY);
             return res.status(200).json({
                 status: true,
