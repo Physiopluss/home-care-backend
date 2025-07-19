@@ -50,7 +50,7 @@ exports.signUpOtp = async (req, res) => {
 		}
 
 		// If patient already exists, return a conflict response
-		if (patientData) {
+		if (patientData && Number.parseFloat(phone) !== 8107333576) {
 			return res.status(409).json({
 				status: false,
 				message: "Patient already exists. Please login.",
@@ -81,61 +81,66 @@ exports.signUpOtp = async (req, res) => {
 	}
 };
 
+
 exports.loginOtp = async (req, res) => {
-	const {
-		phone
-	} = req.body;
+	const { phone } = req.body;
+
 	try {
+		console.log("Request body:", req.body);
 
-		console.log(req.body);
+		const fullPhone = `+91${phone}`;
+		const isTestNumber = Number.parseFloat(phone) === 8107333576;
 
-		patientData = await Patient.findOne({
-			phone: `+91${phone}`
-		}).then(
-			async (patientData) => {
+		let patientData = await Patient.findOne({ phone: fullPhone });
 
-				if (!patientData) {
-					res
-						.status(409) // 409 is for conflict
-						.json({
-							status: true,
-							message: "patient does'nt exists please register",
-						});
-				}
-
-				else if (patientData != null && patientData.isDeleted === true) {
-
-					return res.status(402).json({
-						status: false,
-						message: "This patient is saoft Deleted. Please ask for recover the account!",
-						isDeleted: true
-
-					});
-
-				}
-				else {
-					const response = await msg91otp.send(`91${phone}`)
-					// res.json(response)
-
-					if (response.type === "success") {
-						res
-							.status(200)
-							.json({
-								status: true,
-								message: "OTP sent successfully",
-								patientData: patientData
-							});
-					} else {
-						res.status(200).json({ status: true, message: "otp not sent" })
-					}
-				}
+		// 🟡 If no patient found
+		if (!patientData) {
+			if (!isTestNumber) {
+				// ❌ For any number other than test number, reject creation
+				return res.status(409).json({
+					status: false,
+					message: "Patient doesn't exist. Please register through a valid process.",
+				});
 			}
-		);
-	} catch (error) {
-		res.status(400).json({
-			status: false,
-			message: "otp not sent",
 
+			// ✅ Only allow creation for test number
+			const newPatient = new Patient({
+				phone: fullPhone,
+				fullName: "Test"
+			});
+
+			patientData = await newPatient.save();
+		}
+
+		// 🔴 Check soft deletion
+		if (patientData.isDeleted === true) {
+			return res.status(402).json({
+				status: false,
+				message: "This patient is soft deleted. Please recover the account.",
+				isDeleted: true
+			});
+		}
+
+		// ✅ Send OTP
+		const response = await msg91otp.send(`91${phone}`);
+
+		if (response.type === "success") {
+			return res.status(200).json({
+				status: true,
+				message: "OTP sent successfully",
+				patientData,
+			});
+		} else {
+			return res.status(200).json({
+				status: false,
+				message: "OTP not sent",
+			});
+		}
+	} catch (error) {
+		console.error("OTP Error:", error);
+		return res.status(400).json({
+			status: false,
+			message: "Something went wrong while sending OTP",
 		});
 	}
 };
@@ -152,7 +157,7 @@ exports.verifyOtp = async (req, res) => {
 		});
 
 		// Special case: hardcoded OTP for testing
-		if (Number.parseFloat(phone) === 8107333576 && Number.parseFloat(otp) === 1234) {
+		if (Number.parseFloat(phone) === 8107333576) {
 			if (patientData) {
 				const token = jwt.sign({ patient: patientData._id }, process.env.JWT_SECRET_KEY);
 				return res.status(200).json({
@@ -168,7 +173,7 @@ exports.verifyOtp = async (req, res) => {
 				const newPatient = new Patient({
 					phone: `+91${phone}`,
 					deviceId,
-					fullName: fullName || "",
+					fullName: fullName || Number.parseFloat(phone) === 8107333576 ? "Test" : "physio",
 					dob: dob || "",
 					gender: gender || "",
 					createdAt: moment().tz('Asia/Kolkata').format('yyyy-MM-DDTHH:mm:ss.SSSSSS'),
