@@ -31,6 +31,8 @@ const generateRandomOTP = () => {
 
 exports.createAppointment = async (req, res) => {
 
+    console.log(req.body);
+
     try {
         const {
             patientId,
@@ -43,6 +45,7 @@ exports.createAppointment = async (req, res) => {
             painNotes,
             amount,
             couponId,
+            appointmentAddress
         } = req.body;
 
         if (!patientId) return res.status(400).json({
@@ -150,12 +153,39 @@ exports.createAppointment = async (req, res) => {
             physioAmount: (amount - (platformCharges + gst)),
         });
 
+
+        //appointment add transactionTd
+        appointment.transactionId = transaction._id;
+        await appointment.save()
+
+
+        if (patient) {
+            // Update the patient document with the new appointment address
+            if (patient.appointmentAddress !== appointmentAddress.toString()) {
+                patient.appointmentAddress = appointmentAddress;
+            }
+
+            // Check if address already exists in patientAddresses
+            let isAddressExists = patient.patientAddresses.some((entry) => {
+                return entry.appointmentAddress === appointmentAddress.toString();
+            });
+
+            // If not, push the new address
+            if (!isAddressExists) {
+                patient.patientAddresses.push({
+                    appointmentAddress: appointmentAddress.toString()
+                });
+            }
+
+            await patient.save();
+        }
+
         if (physio && patient) {
             const serviceType = ["Home", "Clinic", "Online"][appointment.serviceType]
 
             let data = {
                 title: "Upcoming consultation!",
-                body: `You have upcoming ${serviceType} consultation`,
+                body: `You have upcoming home consultation`,
                 serviceType: serviceType,
                 physioId: physio._id.toString(),
                 name: patient.fullName,
@@ -176,7 +206,9 @@ exports.createAppointment = async (req, res) => {
 
             // Send Notification to Patient
             data = {}
-            data.name = physio.fullName
+            data.title = "Upcoming consultation!",
+                data.body = `You have upcoming home consultation`,
+                data.name = physio.fullName
             data.type = 'appointment'
             data.from = 'admin'
             data.to = 'patient'
@@ -189,9 +221,7 @@ exports.createAppointment = async (req, res) => {
                 console.log("Error sending notification to patient", result);
             }
         }
-        //appointment add transactionTd
-        appointment.transactionId = transaction._id;
-        await appointment.save()
+
 
         res.status(200).json({
             message: 'Appointment created',
@@ -590,7 +620,8 @@ exports.createAppointmentRazorpay = async (req, res) => {
                 painNotes,
                 amount,
                 couponId: couponId ? couponId : null,
-                appointmentAmount
+                appointmentAmount,
+                appointmentAddress
             }
         };
 
@@ -655,6 +686,7 @@ exports.verifyRazorpayPayment = async (req, res) => {
         const patient = await Patient.findById(payment.notes.patientId);
         const couponId = payment.notes.couponId || null;
         const appointmentAmount = payment.notes.appointmentAmount;
+        const appointmentAddres = appointmentAddress || payment.notes.appointmentAddress
 
         // Create appointment
 
@@ -709,55 +741,6 @@ exports.verifyRazorpayPayment = async (req, res) => {
         } catch (error) {
             console.error('Error saving appointment or updating patient:', error);
         }
-
-        // Send Notification to physio and patient
-        if (physio && patient) {
-            const serviceType = ["Home", "Clinic", "Online"][appointment.serviceType];
-
-            // Send notification to physio
-            const physioData = {
-                physioId: physio._id.toString(),
-                patientId: patient._id.toString(),
-                name: patient.fullName,
-                title: "Upcoming Consultation!",
-                body: `You have upcoming ${serviceType} consultation`,
-                type: 'appointment',
-                from: 'admin',
-                to: 'physio',
-                for: 'physio',
-                time: appointment.time,
-                date: appointment.date
-            }
-
-            // Send notification to patient
-            const patientData = {
-                physioId: physio._id.toString(),
-                patientId: patient._id.toString(),
-                name: physio.fullName,
-                title: "Upcoming Consultation!",
-                body: `You have upcoming ${serviceType} consultation`,
-                type: 'appointment',
-                from: 'admin',
-                to: 'patient',
-                for: 'patient',
-                time: appointment.time,
-                date: appointment.date
-            }
-
-            const [physioResult, patientResult] = await Promise.all([
-                sendFCMNotification(physio.deviceId, physioData),
-                sendFCMNotification(patient.deviceId, patientData)
-            ]);
-
-            if (!physioResult.success) {
-                console.log("Error sending notification to physio", physioResult);
-            }
-
-            if (!patientResult.success) {
-                console.log("Error sending notification to patient", patientResult);
-            }
-        }
-
         // const subscription = await Subscription.findById(physio.subscriptionId).populate("planId");
         // const planType = subscription?.planId?.planType || 0; // fallback
         // // Platform charges case
@@ -793,6 +776,51 @@ exports.verifyRazorpayPayment = async (req, res) => {
         appointment.transactionId = transaction._id;
         await appointment.save();
 
+        // Send Notification to physio and patient
+        if (physio && patient) {
+            // Send notification to physio
+            const physioData = {
+                physioId: physio._id.toString(),
+                patientId: patient._id.toString(),
+                name: patient.fullName,
+                title: "Upcoming Consultation!",
+                body: `You have upcoming home consultation`,
+                type: 'appointment',
+                from: 'admin',
+                to: 'physio',
+                for: 'physio',
+                time: appointment.time,
+                date: appointment.date
+            }
+
+            // Send notification to patient
+            const patientData = {
+                physioId: physio._id.toString(),
+                patientId: patient._id.toString(),
+                name: physio.fullName,
+                title: "Upcoming Consultation!",
+                body: `You have upcoming home consultation`,
+                type: 'appointment',
+                from: 'admin',
+                to: 'patient',
+                for: 'patient',
+                time: appointment.time,
+                date: appointment.date
+            }
+
+            const [physioResult, patientResult] = await Promise.all([
+                sendFCMNotification(physio.deviceId, physioData),
+                sendFCMNotification(patient.deviceId, patientData)
+            ]);
+
+            if (!physioResult.success) {
+                console.log("Error sending notification to physio", physioResult);
+            }
+
+            if (!patientResult.success) {
+                console.log("Error sending notification to patient", patientResult);
+            }
+        }
         res.status(200).json({
             message: 'Appointment created',
             success: true,

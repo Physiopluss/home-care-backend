@@ -259,13 +259,14 @@ exports.loginPhysioOtp = async (req, res) => {
 
 exports.verifyOtpPhysio = async (req, res) => {
     const { otp, phone, deviceId } = req.body;
-
     try {
         const physioData = await Physio.findOne({ phone: `+91${phone}`, isDeleted: false });
 
         // Bypass Login OTP verification for testing
         if (physioData?._id && Number.parseFloat(phone) === 8107333576) {
             const token = jwt.sign({ physio: physioData?._id || null }, process.env.JWT_SECRET_KEY);
+            physioData.deviceId = deviceId
+            await physioData.save()
             return res.status(200).json({
                 status: true,
                 newUser: false,

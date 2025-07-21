@@ -3,6 +3,7 @@ const Notification = require('../models/notification');
 
 
 const sendFCMNotification = async (tokens, data, saveOnly = false) => {
+    
     if (!data.title || !data.body) {
         console.error('Missing title and body in notification data:', data);
         return { success: false, error: 'Invalid notification data' };
@@ -23,6 +24,7 @@ const sendFCMNotification = async (tokens, data, saveOnly = false) => {
         let response = null;
         if (!saveOnly) response = await admin.messaging().sendEachForMulticast(message);
 
+    
         await Notification.create({
             physioId: data.physioId || null,
             patientId: data.patientId || null,
@@ -33,6 +35,7 @@ const sendFCMNotification = async (tokens, data, saveOnly = false) => {
             to: data.to,
             for: data.for || null,
         });
+        
         return { success: true, response };
     } catch (err) {
         console.error('FCM Send Error:', err);

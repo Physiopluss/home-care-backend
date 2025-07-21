@@ -10,6 +10,7 @@ const appointment = require('../../models/appointment');
 const generateRandomCode = require('../../utility/generateRandomCode');
 const { createAppointmentInvoice } = require('../app/appointmentController');
 const coupon = require('../../models/coupon');
+const { sendFCMNotification } = require('../../services/fcmService');
 const generateRandomOTP = () => {
     return Math.floor(1000 + Math.random() * 9000);
 };
@@ -460,6 +461,46 @@ exports.addAppointment = async (req, res) => {
         appointment.transactionId = transaction._id;
         await appointment.save();
 
+        // notification section 
+
+        let notification = {
+            title: "Upcoming consultation!",
+            body: `You have upcoming home consultation with ${patient.fullName}`,
+            physioId: physio._id.toString(),
+            name: patient.fullName,
+            time: appointment.time,
+            date: appointment.date,
+            type: 'appointment',
+            from: 'admin',
+            to: 'physio',
+            for: 'physio'
+        }
+
+        if (physio) {
+
+            let result = await sendFCMNotification(physio?.deviceId, notification)
+
+            if (!result.success) {
+                console.log("Error sending notification to physio", result);
+            }
+
+            notification = {}
+            notification.title = "Upcoming consultation!",
+                notification.body = `You have upcoming home consultation ${physio.fullName}`,
+                notification.name = physio.fullName
+                notification.type = 'appointment'
+            notification.from = 'admin'
+            notification.to = 'patient'
+            notification.for = 'patient'
+            notification.physioId = null
+            notification.patientId = patient._id.toString(),
+                result = await sendFCMNotification(patient?.deviceId, notification)
+
+            if (!result.success) {
+                console.log("Error sending notification to patient", result);
+            }
+
+        }
         return res.status(200).json({
             message: 'Appointment created',
             success: true,
@@ -860,7 +901,7 @@ exports.getAllTreatmentsData = async (req, res) => {
             // 'isTreatmentScheduled.isTreatmentCompleted': false
         }
 
-        const treatments = await Appointment.find(filter).populate('patientId physioId').sort({createdAt :-1});
+        const treatments = await Appointment.find(filter).populate('patientId physioId').sort({ createdAt: -1 });
 
 
         return res.status(200).json({
@@ -887,7 +928,7 @@ exports.getAllTreatmentRequestsData = async (req, res) => {
         const treatments = await Appointment.find({
             appointmentStatus: 1,
             'isTreatmentScheduled.isTreatmentRequest': true
-        }).populate('physioId patientId').sort({'createdAt':-1});
+        }).populate('physioId patientId').sort({ 'createdAt': -1 });
         if (treatments) {
             return res.status(200).json({
                 message: "Treatments fetched successfully",
