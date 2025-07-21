@@ -190,69 +190,72 @@ exports.signUpPhysioOtp = async (req, res) => {
         })
     }
 }
-
-
 exports.loginPhysioOtp = async (req, res) => {
     try {
-        const phone = req.body.phone;
+        const phone = req.query.phone; // assuming /login-otp?phone=8107333576
+        const phoneNumber = Number(phone);
 
         const userData = await Physio.findOne({
             phone: `+91${phone}`,
-        })
+        });
 
-        if (!userData && phone === 8107333576) {
+        // Create a dummy test user if it's the test phone number
+        if (!userData && phoneNumber === 8107333576) {
             const physioN = new Physio({
                 fullName: "Test Google",
                 phone: `+91${phone}`,
-
-            })
+            });
+            await physioN.save();
         }
 
-        if (!userData && phone != Number.parseFloat(phone) === 8107333576) {
+        // Return error for unknown numbers except the test number
+        if (!userData && phoneNumber !== 8107333576) {
             return res.status(400).json({
                 status: false,
-                message: "User with this Phone does not exist"
+                message: "User with this phone number does not exist",
             });
         }
 
-        if (userData.isBlocked) {
+        // User validations
+        if (userData?.isBlocked) {
             return res.status(400).json({
                 status: false,
-                message: "Your account has been blocked"
+                message: "Your account has been blocked",
             });
         }
 
-        if (userData.isDeleted) {
+        if (userData?.isDeleted) {
             return res.status(402).json({
                 status: false,
                 message: "Your account has been deleted",
-                isDeleted: true
-
+                isDeleted: true,
             });
         }
 
+        // Send OTP
         const response = await msg91otp.send(`91${phone}`);
-
         if (response.type !== "success") {
             return res.status(400).json({
                 status: false,
-                message: userData
-            });
-        } else {
-            return res.json({
-                status: true,
-                message: userData,
+                message: "Failed to send OTP",
             });
         }
-    }
-    catch (error) {
+
+        return res.status(200).json({
+            status: true,
+            message: "OTP sent successfully",
+            data: userData,
+        });
+
+    } catch (error) {
+        console.log(error);
         return res.status(500).json({
             status: false,
-            message: "server error ",
-            err: error
+            message: "Server error",
+            error: error.message,
         });
     }
-}
+};
 
 exports.verifyOtpPhysio = async (req, res) => {
     const { otp, phone, deviceId } = req.body;

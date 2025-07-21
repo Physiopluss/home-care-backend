@@ -2,7 +2,7 @@ const router = require('express').Router();
 const authController = require('../../controllers/physio/authController');
 
 router.post('/signup-otp', authController.signUpPhysioOtp);
-router.post('/login-otp', authController.loginPhysioOtp);
+router.get('/login-otp', authController.loginPhysioOtp);
 router.post("/add-wallet-amount", authController.addWalletAmount);
 router.post("/verify-wallet-amount", authController.VerifyWalletAmount);
 router.get('/physioRevenue', authController.physioRevenue)

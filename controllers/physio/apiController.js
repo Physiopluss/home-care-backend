@@ -462,7 +462,6 @@ exports.getUnreadNotification = async (req, res) => {
         if (!chatsWithUnreadMessages) {
             return res.status(404).send({ "message": "no unread notifications" })
         }
-
         return res.status(200).send({
             message: "Notification fetched successfully",
             status: 200,
