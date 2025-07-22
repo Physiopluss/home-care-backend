@@ -11,6 +11,7 @@ const generateRandomCode = require('../../utility/generateRandomCode');
 const { createAppointmentInvoice } = require('../app/appointmentController');
 const coupon = require('../../models/coupon');
 const { sendFCMNotification } = require('../../services/fcmService');
+const invoice = require('../../models/invoice');
 const generateRandomOTP = () => {
     return Math.floor(1000 + Math.random() * 9000);
 };
@@ -58,6 +59,8 @@ exports.getConsultationSummary = async (req, res) => {
 }
 exports.allConsultation = async (req, res) => {
     try {
+
+        
         // Caching logic
         let cacheKey = null;
         const keys = "cacheKey"
@@ -488,7 +491,7 @@ exports.addAppointment = async (req, res) => {
             notification.title = "Upcoming consultation!",
                 notification.body = `You have upcoming home consultation ${physio.fullName}`,
                 notification.name = physio.fullName
-                notification.type = 'appointment'
+            notification.type = 'appointment'
             notification.from = 'admin'
             notification.to = 'patient'
             notification.for = 'patient'
@@ -958,8 +961,6 @@ exports.getAllTreatmentRequestsData = async (req, res) => {
     }
 };
 
-
-
 exports.treatmentRequest = async (req, res) => {
 
     try {
@@ -1002,6 +1003,32 @@ exports.treatmentRequest = async (req, res) => {
     }
 };
 
+exports.getTreatment = async (req, res) => {
+    try {
+        let filter = {
+            appointmentStatus: 1,
+            'isTreatmentScheduled.isTreatmentCompleted': false,
+        };
+
+        const treatments = await Appointment.find(filter)
+            .populate('patientId physioId');
+
+        return res.status(200).json({
+            message: "Treatments fetched successfully",
+            status: 200,
+            success: true,
+            data: treatments
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            message: "Something went wrong",
+            status: 500,
+            success: false,
+            error: error.message
+        });
+    }
+};
 
 exports.treatmentScheduleFromAdmin = async (req, res) => {
     try {
@@ -1099,7 +1126,6 @@ exports.treatmentScheduleFromAdmin = async (req, res) => {
         });
     }
 };
-
 
 exports.completeTreatment = async (req, res) => {
     try {
@@ -1215,8 +1241,6 @@ exports.completeTreatment = async (req, res) => {
     }
 };
 
-
-
 exports.acceptTreatmentRequest = async (req, res) => {
     try {
         const { id, payload } = req.body;
@@ -1298,7 +1322,6 @@ exports.acceptTreatmentRequest = async (req, res) => {
 exports.getTreatmentsSummary = async (req, res) => {
 
 }
-
 
 exports.completeConsultation = async (req, res) => {
     try {
@@ -1409,8 +1432,6 @@ exports.completeConsultation = async (req, res) => {
     }
 };
 
-
-
 exports.completeTreatment = async (req, res) => {
     try {
         const { id } = req.query;
@@ -1454,7 +1475,6 @@ exports.completeTreatment = async (req, res) => {
         });
     }
 };
-
 
 exports.deleteTreatment = async (req, res) => {
     try {
@@ -1505,3 +1525,186 @@ exports.deleteTreatment = async (req, res) => {
         });
     }
 }
+
+exports.requestFilter = async (req, res) => {
+    try {
+        const {
+            name,
+            status,
+            date,
+            page = 1,
+            perPage = 10,
+            cache = false
+        } = req.query;
+
+        console.log(req.query);
+
+        const currentPage = parseInt(page);
+        const limit = parseInt(perPage);
+        const skip = (currentPage - 1) * limit;
+
+        let query = {
+            isDeleted: false, isBlocked: false
+        };
+
+        if (status) {
+            switch (status) {
+
+                // case 'all': { query}
+                // case "pending" : {query.}
+
+            }
+        }
+
+        if (name) {
+            const searchTerm = name.toLowerCase().trim();
+            query.$or = [
+                { "patientId.fullName": { $regex: searchTerm, $options: 'i' } },
+                { "patientId.phone": { $regex: searchTerm, $options: 'i' } },
+                { "patientId.zipCode": { $regex: searchTerm, $options: 'i' } },
+            ]
+        }
+
+        if (date) {
+            const startOfDayIST = moment.tz(date, 'Asia/Kolkata').startOf('day');
+            const endOfDayIST = moment.tz(date, 'Asia/Kolkata').endOf('day');
+            const startUTC = new Date(startOfDayIST.toISOString());
+            const endUTC = new Date(endOfDayIST.toISOString());
+            query.createdAt = { $gte: startUTC, $lte: endUTC };
+        }
+
+        // Caching logic
+        let cacheKey = null;
+        if (cache) {
+            const keys = { name, onboardedFrom, date, freePhysio, planType, page, perPage };
+            const hash = crypto.createHash('sha256').update(JSON.stringify(keys)).digest('hex');
+            cacheKey = `admin:AllPhysio:${hash}`;
+            const cachedData = await redisClient.get(cacheKey);
+            if (cachedData) {
+                console.log("> Returning cached data ( requestFilter)");
+                return res.status(200).json({
+                    message: "All Request",
+                    status: 200,
+                    success: true,
+                    ...JSON.parse(cachedData),
+                    query
+                });
+            }
+        }
+
+        // Aggregation pipeline
+        const aggregationPipeline = [
+            { $match: query },
+            { $sort: { createdAt: -1 } },
+            {
+                $lookup: {
+                    from: 'subscriptions',
+                    localField: 'subscriptionId',
+                    foreignField: '_id',
+                    as: 'subscription'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$subscription',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'plans',
+                    localField: 'subscription.planId',
+                    foreignField: '_id',
+                    as: 'plan'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$plan',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $facet: {
+                    data: [
+                        { $skip: skip },
+                        { $limit: limit }
+                    ],
+                    totalCount: [
+                        { $count: 'count' }
+                    ]
+                }
+            }
+        ];
+
+        const [result] = await Physio.aggregate(aggregationPipeline);
+        const totalCount = result.totalCount[0]?.count || 0;
+
+
+        const responseData = {
+            message: "All physios",
+            status: 200,
+            success: true,
+            data: result.data,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit),
+            currentPage,
+            query
+        };
+
+        if (cache) {
+            await redisClient.set(cacheKey, JSON.stringify(responseData), {
+                EX: CACHE_EXPIRATION.ONE_HOUR
+            });
+        }
+
+        return res.status(200).json(responseData);
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: "Something went wrong. Please try again. " + error.message,
+            status: 500,
+            success: false
+        });
+    }
+};
+
+
+exports.getInvoice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const appointmentStatus = parseInt(req.query.appointmentStatus || "0");
+
+        if (!id) {
+            return res.status(400).json({
+                message: 'appointmentId is required',
+                status: 400,
+            });
+        }
+
+        console.log("Fetching invoice for:", { id, appointmentStatus });
+
+        const invoices = await invoice.findOne({
+            appointmentId: id,
+            type: appointmentStatus === 0 ? "appointment" : "treatment"
+        }).populate('transactionId patientId physioId appointmentId');
+
+        return res.status(200).json({
+            message: 'Invoices fetched',
+            success: true,
+            status: 200,
+            data: invoices
+        });
+
+    } catch (error) {
+        console.error("Error in getInvoice:", error);
+        return res.status(500).json({
+            message: 'Something went wrong, please try again',
+            status: 500,
+            success: false,
+            error: error.message
+        });
+    }
+};
+

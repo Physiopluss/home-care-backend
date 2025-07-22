@@ -161,19 +161,19 @@ exports.createAppointment = async (req, res) => {
 
         if (patient) {
             // Update the patient document with the new appointment address
-            if (patient.appointmentAddress !== appointmentAddress.toString()) {
+            if (patient.appointmentAddress !== appointmentAddress?.toString()) {
                 patient.appointmentAddress = appointmentAddress;
             }
 
             // Check if address already exists in patientAddresses
             let isAddressExists = patient.patientAddresses.some((entry) => {
-                return entry.appointmentAddress === appointmentAddress.toString();
+                return entry.appointmentAddress === appointmentAddress?.toString();
             });
 
             // If not, push the new address
             if (!isAddressExists) {
                 patient.patientAddresses.push({
-                    appointmentAddress: appointmentAddress.toString()
+                    appointmentAddress: appointmentAddress?.toString()
                 });
             }
 

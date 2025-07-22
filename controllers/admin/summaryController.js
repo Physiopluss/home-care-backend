@@ -421,8 +421,9 @@ exports.getSummaryPhysios = async (req, res) => {
         // Promise All
         const [
             approvedPhysioCount, pendingPhysioCount, todayPhysioCount,
-            editRequestCount, todayEditRequestCount,
-            withdrawalRequestCount, todayWithdrawalRequestCount
+            withdrawalRequestCount, todayWithdrawalRequestCount,
+            TotalCashRepay, TodayCashRepay
+
         ] = await Promise.all([
             Physio.countDocuments({ isDeleted: false, isBlocked: false, accountStatus: 1 }),
             Physio.countDocuments({ isDeleted: false, isBlocked: false, accountStatus: 0 }),
@@ -434,16 +435,6 @@ exports.getSummaryPhysios = async (req, res) => {
                     $lt: new Date(new Date().setHours(23, 59, 59, 999))
                 }
             }),
-
-            PhysioProfileEdit.countDocuments({ status: 'pending' }),
-            PhysioProfileEdit.countDocuments({
-                status: 'pending',
-                createdAt: {
-                    $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-                    $lt: new Date(new Date().setHours(23, 59, 59, 999))
-                }
-            }),
-
             Transaction.countDocuments({ physioTransactionType: 2 }),
             Transaction.countDocuments({
                 physioTransactionType: 2,
@@ -451,7 +442,14 @@ exports.getSummaryPhysios = async (req, res) => {
                     $gte: new Date(new Date().setHours(0, 0, 0, 0)),
                     $lt: new Date(new Date().setHours(23, 59, 59, 999))
                 }
-            })
+            }),
+            Transaction.countDocuments({ paidTo: "physioPlus", paidFor: "debt" }),
+            Transaction.countDocuments({
+                paidTo: "physioPlus", paidFor: "debt", createdAt: {
+                    $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+                    $lt: new Date(new Date().setHours(23, 59, 59, 999))
+                }
+            },),
         ]);
 
         const data = {
@@ -460,9 +458,9 @@ exports.getSummaryPhysios = async (req, res) => {
                 pendingCount: pendingPhysioCount,
                 today: todayPhysioCount
             },
-            editRequest: {
-                total: editRequestCount,
-                today: todayEditRequestCount
+            cashRepay: {
+                total: TotalCashRepay,
+                today: TodayCashRepay
             },
             withdrawalRequest: {
                 total: withdrawalRequestCount,
@@ -495,128 +493,128 @@ exports.getSummaryPhysios = async (req, res) => {
  * @apiSuccess {Object} data Object containing subscription statistics.
  * @apiError {Object} error Error object
  */
-exports.getPhysioSubscriptionStats = async (req, res) => {
-    try {
-        // 1. Count physios with free plan and 4+ patients
-        const freePlanLimitReachedQuery = Physio.aggregate([
-            {
-                $match: {
-                    subscriptionId: { $ne: null },
-                    subscriptionCount: { $gt: 0 },
-                    isDeleted: false,
-                    isBlocked: false
-                }
-            },
-            {
-                $lookup: {
-                    from: 'subscriptions',
-                    localField: 'subscriptionId',
-                    foreignField: '_id',
-                    as: 'subscription'
-                }
-            },
-            { $unwind: '$subscription' },
-            {
-                $lookup: {
-                    from: 'plans',
-                    localField: 'subscription.planId',
-                    foreignField: '_id',
-                    as: 'plan'
-                }
-            },
-            { $unwind: '$plan' },
-            {
-                $match: {
-                    'plan.planType': 0,
-                    'subscription.patientCount': { $gte: 4 }
-                }
-            },
-            { $count: 'count' }
-        ]);
+// exports.getPhysioSubscriptionStats = async (req, res) => {
+//     try {
+//         // 1. Count physios with free plan and 4+ patients
+//         const freePlanLimitReachedQuery = Physio.aggregate([
+//             {
+//                 $match: {
+//                     subscriptionId: { $ne: null },
+//                     subscriptionCount: { $gt: 0 },
+//                     isDeleted: false,
+//                     isBlocked: false
+//                 }
+//             },
+//             {
+//                 $lookup: {
+//                     from: 'subscriptions',
+//                     localField: 'subscriptionId',
+//                     foreignField: '_id',
+//                     as: 'subscription'
+//                 }
+//             },
+//             { $unwind: '$subscription' },
+//             {
+//                 $lookup: {
+//                     from: 'plans',
+//                     localField: 'subscription.planId',
+//                     foreignField: '_id',
+//                     as: 'plan'
+//                 }
+//             },
+//             { $unwind: '$plan' },
+//             {
+//                 $match: {
+//                     'plan.planType': 0,
+//                     'subscription.patientCount': { $gte: 4 }
+//                 }
+//             },
+//             { $count: 'count' }
+//         ]);
 
-        // 2. Count physios whose subscription expires within N days
-        const aboutToExpireInDays = 30;
-        const expiringSoonQuery = Physio.aggregate([
-            {
-                $match: {
-                    subscriptionId: { $ne: null },
-                    isDeleted: false,
-                    isBlocked: false
-                }
-            },
-            {
-                $lookup: {
-                    from: 'subscriptions',
-                    localField: 'subscriptionId',
-                    foreignField: '_id',
-                    as: 'subscription'
-                }
-            },
-            { $unwind: '$subscription' },
-            {
-                $addFields: {
-                    daysUntilExpiry: {
-                        $divide: [
-                            { $subtract: ["$subscription.expireAt", new Date()] },
-                            1000 * 60 * 60 * 24
-                        ]
-                    }
-                }
-            },
-            {
-                $match: {
-                    daysUntilExpiry: { $gte: 0, $lte: aboutToExpireInDays }
-                }
-            },
-            { $count: 'count' }
-        ]);
+//         // 2. Count physios whose subscription expires within N days
+//         const aboutToExpireInDays = 30;
+//         const expiringSoonQuery = Physio.aggregate([
+//             {
+//                 $match: {
+//                     subscriptionId: { $ne: null },
+//                     isDeleted: false,
+//                     isBlocked: false
+//                 }
+//             },
+//             {
+//                 $lookup: {
+//                     from: 'subscriptions',
+//                     localField: 'subscriptionId',
+//                     foreignField: '_id',
+//                     as: 'subscription'
+//                 }
+//             },
+//             { $unwind: '$subscription' },
+//             {
+//                 $addFields: {
+//                     daysUntilExpiry: {
+//                         $divide: [
+//                             { $subtract: ["$subscription.expireAt", new Date()] },
+//                             1000 * 60 * 60 * 24
+//                         ]
+//                     }
+//                 }
+//             },
+//             {
+//                 $match: {
+//                     daysUntilExpiry: { $gte: 0, $lte: aboutToExpireInDays }
+//                 }
+//             },
+//             { $count: 'count' }
+//         ]);
 
-        // 3. Count physios with expired subscriptions
-        const expiredPhysioCountQuery = Physio.aggregate([
-            {
-                $match: {
-                    subscriptionId: { $eq: null },
-                    subscriptionCount: { $gt: 0 },
-                    isDeleted: false,
-                    isBlocked: false
-                }
-            },
-            { $count: 'count' }
-        ]);
+//         // 3. Count physios with expired subscriptions
+//         const expiredPhysioCountQuery = Physio.aggregate([
+//             {
+//                 $match: {
+//                     subscriptionId: { $eq: null },
+//                     subscriptionCount: { $gt: 0 },
+//                     isDeleted: false,
+//                     isBlocked: false
+//                 }
+//             },
+//             { $count: 'count' }
+//         ]);
 
-        // Run all three in parallel
-        const [freePlanLimitReached, expiringSoon, expiredPhysios] = await Promise.all([
-            freePlanLimitReachedQuery,
-            expiringSoonQuery,
-            expiredPhysioCountQuery
-        ]);
+//         // Run all three in parallel
+//         const [freePlanLimitReached, expiringSoon, expiredPhysios] = await Promise.all([
+//             freePlanLimitReachedQuery,
+//             expiringSoonQuery,
+//             expiredPhysioCountQuery
+//         ]);
 
-        // Extract counts with fallback to 0
-        const physioWithExpiredFreePlanCount = freePlanLimitReached[0]?.count || 0;
-        const physioAboutToExpireCount = expiringSoon[0]?.count || 0;
-        const expiredPhysioCount = expiredPhysios[0]?.count || 0;
+//         // Extract counts with fallback to 0
+//         const physioWithExpiredFreePlanCount = freePlanLimitReached[0]?.count || 0;
+//         const physioAboutToExpireCount = expiringSoon[0]?.count || 0;
+//         const expiredPhysioCount = expiredPhysios[0]?.count || 0;
 
-        const data = {
-            physio: {
-                freePlanExpiredCount: physioWithExpiredFreePlanCount,
-                aboutToExpireCount: physioAboutToExpireCount,
-                expiredCount: expiredPhysioCount
-            }
-        };
+//         const data = {
+//             physio: {
+//                 freePlanExpiredCount: physioWithExpiredFreePlanCount,
+//                 aboutToExpireCount: physioAboutToExpireCount,
+//                 expiredCount: expiredPhysioCount
+//             }
+//         };
 
-        res.status(200).json({
-            success: true,
-            message: 'Physio subscription stats fetched successfully',
-            data
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch physio subscription stats',
-            error: error.message
-        });
-    }
-}
+//         res.status(200).json({
+//             success: true,
+//             message: 'Physio subscription stats fetched successfully',
+//             data
+//         });
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: 'Failed to fetch physio subscription stats',
+//             error: error.message
+//         });
+//     }
+// }
 
 
 /**

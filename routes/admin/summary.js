@@ -6,7 +6,6 @@ router.get('/summary-state-wise', SummaryController.getSummaryStateWise);
 router.get('/summary-city-wise', SummaryController.getSummaryCityWise);
 router.get('/summary-physios', SummaryController.getSummaryPhysios);
 router.get('/filter-physios', SummaryController.filterPhysios);
-router.get('/physio-subscription-stats', SummaryController.getPhysioSubscriptionStats);
 
 // Patient Side
 router.get('/summary-patients', SummaryController.getSummaryPatients);

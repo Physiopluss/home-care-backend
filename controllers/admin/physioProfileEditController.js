@@ -323,6 +323,7 @@ exports.editPhysioProfile = async (req, res) => {
                 language: req.body.language || physio.language || null,
                 latitude: req.body.latitude || physio.latitude || null,
                 longitude: req.body.longitude || physio.longitude || null,
+                treatedPatient: req.body.treatedPatients != " " ? req.body.treatedPatients || physio.treatedPatient || null : []
             },
             {
                 new: true

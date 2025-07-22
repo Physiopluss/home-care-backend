@@ -12,10 +12,13 @@ router.get('/allConsultationRequests', appointmentController.allConsultationRequ
 router.post('/consultationsRequestId', appointmentController.addAppointment)
 router.get('/consultationRequest', appointmentController.consultationRequest);
 router.post('/acceptConsultationRequest', appointmentController.acceptConsultationRequest);
+router.post('/requestFilter', appointmentController.requestFilter);
 
+router.get('/getInvoice/:id', appointmentController.getInvoice);
 // Treatments
 router.get('/todayTreatment', appointmentController.getAppointmentByTreatment)
 router.get('/treatmentRequest', appointmentController.treatmentRequest);
+router.get('/get-treatment', appointmentController.getTreatment)
 router.post('/treatmentScheduleFromAdmin', appointmentController.treatmentScheduleFromAdmin)
 router.post('/treatmentPayDates', appointmentController.verifyTreatmentSingleDayPayment)
 router.post('/completeTreatment', appointmentController.completeTreatment)

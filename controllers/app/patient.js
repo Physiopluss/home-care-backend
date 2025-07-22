@@ -87,8 +87,6 @@ exports.loginOtp = async (req, res) => {
 
 	try {
 		console.log("Request body:", req.body);
-
-		const fullPhone = `+91${phone}`;
 		const isTestNumber = Number.parseFloat(phone) === 8107333576;
 
 		let patientData = await Patient.findOne({ phone: fullPhone });
@@ -105,7 +103,7 @@ exports.loginOtp = async (req, res) => {
 
 			// ✅ Only allow creation for test number
 			const newPatient = new Patient({
-				phone: fullPhone,
+				phone: phone,
 				fullName: "Test"
 			});
 
@@ -171,7 +169,7 @@ exports.verifyOtp = async (req, res) => {
 			} else {
 				// Signup flow for new user
 				const newPatient = new Patient({
-					phone: `+91${phone}`,
+					phone: phone,
 					deviceId,
 					fullName: fullName || Number.parseFloat(phone) === 8107333576 ? "Test" : "physio",
 					dob: dob || "",
