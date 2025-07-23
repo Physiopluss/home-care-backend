@@ -26,24 +26,28 @@ exports.getConsultationSummary = async (req, res) => {
         const endOfDayIST = moment.tz(new Date(), 'Asia/Kolkata').endOf('day');
         const startUTC = new Date(startOfDayIST.toISOString());
         const endUTC = new Date(endOfDayIST.toISOString());
-        const today = { $gte: startUTC, $lte: endUTC };
+        const todayDate = { $gte: startUTC, $lte: endUTC };
 
         // Get Total Paid/Unpaid Physio Connect
-        const totalAppointment = await Appointment.countDocuments();
-        const totalPaidAppointment = await Appointment.countDocuments({ paymentStatus: 1 });
-        const totalUnpaidAppointments = await Appointment.countDocuments({ paymentStatus: 0 });
+        const total = await Appointment.countDocuments();
+        const totalPending = await Appointment.countDocuments({ isAppointmentTransfer: false });
+        const totalCompleted = await Appointment.countDocuments({ appointmentCompleted: true });
+        const totalCash = await Appointment.countDocuments({ paymentMode: "cash" });
+        const totalOnline = await Appointment.countDocuments({ paymentMode: "online" });
+        const today = await Appointment.countDocuments({ createdAt: todayDate });
 
         // Get Today Paid/Unpaid Physio Connect
-        const todayPaidPhysioConnect = await Appointment.countDocuments({ isPhysioConnectPaid: true, isPhysioConnectPaidDate: today });
-        const todayPendingPhysioConnect = await Appointment.countDocuments({ isPhysioConnectPaid: false, createdAt: today });
         return res.status(200).json({
             message: 'Physio Connect summary',
             status: 200,
             success: true,
             data: {
-                totalAppointment,
-                totalPaidAppointment,
-                totalUnpaidAppointments,
+                total,
+                totalPending,
+                totalCompleted,
+                totalCash,
+                totalOnline,
+                today
             }
         });
 
@@ -57,27 +61,215 @@ exports.getConsultationSummary = async (req, res) => {
         });
     }
 }
-exports.allConsultation = async (req, res) => {
-    try {
 
-        
-        // Caching logic
-        let cacheKey = null;
-        const keys = "cacheKey"
-        const hash = crypto.createHash('sha256').update(JSON.stringify(keys)).digest('hex');
-        cacheKey = `admin:AllPhysioConnect:${hash}`;
-        const cachedData = await redisClient.get(cacheKey);
+exports.allConsultation = async (req, res) => {
+    console.log("Request Query:", req.query);
+    try {
+        const {
+            name,
+            status,
+            date,
+            page = 1,
+            perPage = 10,
+            cache = false
+        } = req.query;
+
+        const currentPage = parseInt(page);
+        const limit = parseInt(perPage);
+        const skip = (currentPage - 1) * limit;
+
+
+
+        const matchStage = {};
+        // console.log("Match Stage:", matchStage);
+        // Handle status filtering
+        if (status) {
+            if (status === 'upcoming') matchStage.appointmentCompleted = false;
+            else if (status === 'completed') matchStage.appointmentCompleted = true;
+            else if (status === 'cash') matchStage.paymentMode = 'cash';
+            else if (status === 'online') matchStage.paymentMode = 'online';
+        }
+
+        // Handle date filtering
+        if (date) {
+            const startOfDayIST = moment.tz(date, 'Asia/Kolkata').startOf('day');
+            const endOfDayIST = moment.tz(date, 'Asia/Kolkata').endOf('day');
+            matchStage.createdAt = {
+                $gte: new Date(startOfDayIST.toISOString()),
+                $lte: new Date(endOfDayIST.toISOString())
+            };
+        }
+
+        // console.log("Match Stage:", matchStage);
+
+        // Optional caching logic
+        const keys = JSON.stringify({ name, status, date, page, perPage });
+        const hash = crypto.createHash('sha256').update(keys).digest('hex');
+        const cacheKey = `admin:AllPhysioConnect:${hash}`;
+
+        // const cachedData = await redisClient.get(cacheKey);
         // if (cachedData) {
-        //     console.log("> Returning cached data (Admin AllPhysioConnect)");
-        //     return res.status(200).json({
-        //         message: "All physios connect",
-        //         status: 200,
-        //         success: true,
-        //         ...JSON.parse(cachedData),
-        //     });
+        //     console.log("> Returning cached data from Redis");
+        //     return res.status(200).json(JSON.parse(cachedData));
         // }
+
         // Aggregation pipeline
-        const result = await Appointment.find({ isAppointmentTransfer: true }).sort({ createdAt: -1 });
+        console.log(matchStage);
+
+        const aggregationPipeline = [
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'patients', // make sure this is the actual collection name
+                    localField: 'patientId',
+                    foreignField: '_id',
+                    as: 'patientId'
+                }
+            },
+            { $unwind: "$patientId" },
+            {
+                $lookup: {
+                    from: 'physios', // make sure this is the actual collection name
+                    localField: 'physioId',
+                    foreignField: '_id',
+                    as: 'physioId'
+                }
+            },
+            { $unwind: "$physioId" },
+
+            ...(name
+                ? [{
+                    $match: {
+                        $or: [
+                            { "patientId.fullName": { $regex: name.trim(), $options: 'i' } },
+                            { "patientId.phone": { $regex: name.trim(), $options: 'i' } },
+                            { "patientId.ZipCode": { $regex: name.trim(), $options: 'i' } }
+                        ]
+                    }
+                }]
+                : []
+            ),
+
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit }
+        ];
+
+        // console.log("Aggregation Pipeline:", JSON.stringify(aggregationPipeline, null, 2));
+
+        const result = await Appointment.aggregate(aggregationPipeline);
+
+        const responseData = {
+            message: "All Appointment",
+            status: 200,
+            success: true,
+            data: result,
+        };
+
+        // await redisClient.set(cacheKey, JSON.stringify(responseData));
+
+        return res.status(200).json(responseData);
+    } catch (error) {
+        console.error("Error in allConsultation:", error);
+        return res.status(500).json({
+            message: "Something went wrong. Please try again. " + error.message,
+            status: 500,
+            success: false
+        });
+    }
+};
+
+
+
+exports.allConsultationRequests = async (req, res) => {
+    console.log("Request Query:", req.query);
+
+    try {
+        const {
+            name,
+            status,
+            date,
+            page = 1,
+            perPage = 10,
+            cache = false
+        } = req.query;
+
+        const currentPage = parseInt(page);
+        const limit = parseInt(perPage);
+        const skip = (currentPage - 1) * limit;
+        const matchStage = {};
+        matchStage.isAppointmentRequest = true
+        // Handle status filtering
+        if (status) {
+            if (status === 'upcoming') matchStage.isAppointmentTransfer = false;
+            else if (status === 'completed') matchStage.isAppointmentTransfer = true;
+            else if (status === 'cash') matchStage.paymentMode = 'cash';
+            else if (status === 'online') matchStage.paymentMode = 'online';
+        }
+
+        // Handle date filtering
+        if (date) {
+            const startOfDayIST = moment.tz(date, 'Asia/Kolkata').startOf('day');
+            const endOfDayIST = moment.tz(date, 'Asia/Kolkata').endOf('day');
+            matchStage.createdAt = {
+                $gte: new Date(startOfDayIST.toISOString()),
+                $lte: new Date(endOfDayIST.toISOString())
+            };
+        }
+
+        console.log("Match Stage:", matchStage);
+
+        // Optional caching logic
+        const keys = JSON.stringify({ name, status, date, page, perPage });
+        const hash = crypto.createHash('sha256').update(keys).digest('hex');
+        const cacheKey = `admin:AllPhysioConnect:${hash}`;
+
+        // const cachedData = await redisClient.get(cacheKey);
+        // if (cachedData) {
+        //     console.log("> Returning cached data from Redis");
+        //     return res.status(200).json(JSON.parse(cachedData));
+        // }
+
+        // Aggregation pipeline
+        const aggregationPipeline = [
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'patients', // make sure this is the actual collection name
+                    localField: 'patientId',
+                    foreignField: '_id',
+                    as: 'patientId'
+                }
+            },
+            { $unwind: "$patientId" },
+            {
+                $lookup: {
+                    from: 'physios', // make sure this is the actual collection name
+                    localField: 'physioId',
+                    foreignField: '_id',
+                    as: 'physioId'
+                }
+            },
+            { $unwind: "$physioId" },
+
+            ...(name
+                ? [{
+                    $match: {
+                        $or: [
+                            { "patientId.fullName": { $regex: name.trim(), $options: 'i' } },
+                            { "patientId.phone": { $regex: name.trim(), $options: 'i' } },
+                            { "patientId.ZipCode": { $regex: name.trim(), $options: 'i' } }
+                        ]
+                    }
+                }]
+                : []
+            ),
+
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit }
+        ];
+        const result = await Appointment.aggregate(aggregationPipeline);
 
         const responseData = {
             message: "All requestAppointment",
@@ -86,11 +278,11 @@ exports.allConsultation = async (req, res) => {
             data: result,
         };
 
-        // await redisClient.set(cacheKey, JSON.stringify(responseData),)
+        // await redisClient.set(cacheKey, JSON.stringify(responseData));
 
         return res.status(200).json(responseData);
     } catch (error) {
-        console.error(error);
+        console.error("Error in allConsultation:", error);
         return res.status(500).json({
             message: "Something went wrong. Please try again. " + error.message,
             status: 500,
@@ -98,46 +290,7 @@ exports.allConsultation = async (req, res) => {
         });
     }
 };
-exports.allConsultationRequests = async (req, res) => {
-    try {
 
-        // Caching logic
-        let cacheKey = null;
-        const keys = "cacheKey"
-        const hash = crypto.createHash('sha256').update(JSON.stringify(keys)).digest('hex');
-        cacheKey = `admin:AllPhysioConnect:${hash}`;
-        const cachedData = await redisClient.get(cacheKey);
-        // if (cachedData) {
-        //     console.log("> Returning cached data (Admin AllPhysioConnect)");
-        //     return res.status(200).json({
-        //         message: "All physios connect",
-        //         status: 200,
-        //         success: true,
-        //         ...JSON.parse(cachedData),
-        //     });
-        // }
-        // Aggregation pipeline
-        const result = await Appointment.find({ isAppointmentRequest: true }).sort({ createdAt: -1 });
-
-        const responseData = {
-            message: "All Consultation",
-            status: 200,
-            success: true,
-            data: result,
-        };
-
-        await redisClient.set(cacheKey, JSON.stringify(responseData),)
-
-        return res.status(200).json(responseData);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            message: "Something went wrong. Please try again. " + error.message,
-            status: 500,
-            success: false
-        });
-    }
-};
 exports.getAllTreatment = async (req, res) => {
     try {
         console.log('this');
@@ -210,34 +363,34 @@ exports.getAppointments = async (req, res) => {
 };
 
 // Get appointment by id
-exports.getAppointmentttt = async (req, res) => {
-    try {
-        let appointmentId = req.params.id;
+// exports.getAppointment = async (req, res) => {
+//     try {
+//         let appointmentId = req.params.id;
 
-        if (!appointmentId) {
-            return res.status(400).json({
-                message: "Appointment id is required",
-                status: 400,
-                success: false
-            });
-        }
+//         if (!appointmentId) {
+//             return res.status(400).json({
+//                 message: "Appointment id is required",
+//                 status: 400,
+//                 success: false
+//             });
+//         }
 
-        const appointment = await Appointment.findById(appointmentId).populate('patientId physioId');
-        return res.status(200).json({
-            message: "Appointment",
-            status: 200,
-            success: true,
-            data: appointment
-        });
-    } catch (error) {
-        return res.status(500).json({
-            message: "Semething went wrong",
-            status: 500,
-            success: false,
-            error: error.message
-        });
-    }
-};
+//         const appointment = await Appointment.findById(appointmentId).populate('patientId physioId');
+//         return res.status(200).json({
+//             message: "Appointment",
+//             status: 200,
+//             success: true,
+//             data: appointment
+//         });
+//     } catch (error) {
+//         return res.status(500).json({
+//             message: "Semething went wrong",
+//             status: 500,
+//             success: false,
+//             error: error.message
+//         });
+//     }
+// };
 
 // Get all appointments by Today
 exports.getTodayAppointments = async (req, res) => {
@@ -893,72 +1046,87 @@ exports.verifyTreatmentSingleDayPayment = async (req, res) => {
 };
 
 exports.getAllTreatmentsData = async (req, res) => {
-    try {
-        console.log('this');
+    console.log(req.query);
 
-        let filter = {
-            appointmentStatus: 1,
-            "isTreatmentScheduled.isTreatmentTransfer": true,
-            patientId: { $ne: null },
-            physioId: { $ne: null },
-            // 'isTreatmentScheduled.isTreatmentCompleted': false
-        }
-
-        const treatments = await Appointment.find(filter).populate('patientId physioId').sort({ createdAt: -1 });
+    // try {
 
 
-        return res.status(200).json({
-            message: "Treatments fetched successfully",
-            status: 200,
-            success: true,
-            data: treatments
-        });
-    } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Something went wrong",
-            status: 500,
-            success: false,
-            error: error.message
-        });
-    }
+    //     const {
+    //         name,
+    //         status,
+    //         date,
+    //         freePhysio,
+    //         planType,
+    //         page = 1,
+    //         perPage = 10,
+    //         cache = false
+    //     } = req.query;
+
+    //     let filter = {
+    //         appointmentStatus: 1,
+    //         "isTreatmentScheduled.isTreatmentTransfer": true,
+    //         patientId: { $ne: null },
+    //         physioId: { $ne: null },
+    //         // 'isTreatmentScheduled.isTreatmentCompleted': false
+    //     }
+
+    //     const treatments = await Appointment.find(filter).populate('patientId physioId').sort({ createdAt: -1 });
+
+
+    //     return res.status(200).json({
+    //         message: "Treatments fetched successfully",
+    //         status: 200,
+    //         success: true,
+    //         data: treatments
+    //     });
+    // } catch (error) {
+    //     console.log(error);
+    //     return res.status(500).json({
+    //         message: "Something went wrong",
+    //         status: 500,
+    //         success: false,
+    //         error: error.message
+    //     });
+    // }
 };
 
 exports.getAllTreatmentRequestsData = async (req, res) => {
-    try {
-        console.log('this')
+    console.log(req.query);
 
-        const treatments = await Appointment.find({
-            appointmentStatus: 1,
-            'isTreatmentScheduled.isTreatmentRequest': true
-        }).populate('physioId patientId').sort({ 'createdAt': -1 });
-        if (treatments) {
-            return res.status(200).json({
-                message: "Treatments fetched successfully",
-                status: 200,
-                success: true,
-                data: treatments
-            });
-        }
+    // try {
+    //     console.log('this')
 
-        console.log(treatments);
+    //     const treatments = await Appointment.find({
+    //         appointmentStatus: 1,
+    //         'isTreatmentScheduled.isTreatmentRequest': true
+    //     }).populate('physioId patientId').sort({ 'createdAt': -1 });
+    //     if (treatments) {
+    //         return res.status(200).json({
+    //             message: "Treatments fetched successfully",
+    //             status: 200,
+    //             success: true,
+    //             data: treatments
+    //         });
+    //     }
 
-        return res.status(404).json({
-            message: "Treatments not found",
-            status: 404,
-            success: false,
+    //     console.log(treatments);
 
-        });
+    //     return res.status(404).json({
+    //         message: "Treatments not found",
+    //         status: 404,
+    //         success: false,
 
-    } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Something went wrong",
-            status: 500,
-            success: false,
-            error: error.message
-        });
-    }
+    //     });
+
+    // } catch (error) {
+    //     console.log(error);
+    //     return res.status(500).json({
+    //         message: "Something went wrong",
+    //         status: 500,
+    //         success: false,
+    //         error: error.message
+    //     });
+    // }
 };
 
 exports.treatmentRequest = async (req, res) => {
@@ -1320,7 +1488,47 @@ exports.acceptTreatmentRequest = async (req, res) => {
 };
 
 exports.getTreatmentsSummary = async (req, res) => {
+    try {
+        // let query = { isDeleted: false, isBlocked: false, isPhysioConnect: true }
 
+        const startOfDayIST = moment.tz(new Date(), 'Asia/Kolkata').startOf('day');
+        const endOfDayIST = moment.tz(new Date(), 'Asia/Kolkata').endOf('day');
+        const startUTC = new Date(startOfDayIST.toISOString());
+        const endUTC = new Date(endOfDayIST.toISOString());
+        const todayDate = { $gte: startUTC, $lte: endUTC };
+
+        // Get Total Paid/Unpaid Physio Connect
+        const total = await Appointment.countDocuments({ appointmentStatus: 1 });
+        const totalPending = await Appointment.countDocuments({ appointmentStatus: 1, "isTreatmentScheduled.isTreatmentTransfer": false });
+        const totalCompleted = await Appointment.countDocuments({ appointmentStatus: 1, "isTreatmentScheduled.isTreatmentCompleted": true });
+        const totalCash = await Appointment.countDocuments({ appointmentStatus: 1, paymentMode: "cash" });
+        const totalOnline = await Appointment.countDocuments({ appointmentStatus: 1, paymentMode: "online" });
+        const today = await Appointment.countDocuments({ appointmentStatus: 1, updatedAt: todayDate });
+
+        // Get Today Paid/Unpaid Physio Connect
+        return res.status(200).json({
+            message: 'Physio Connect summary',
+            status: 200,
+            success: true,
+            data: {
+                total,
+                totalPending,
+                totalCompleted,
+                totalCash,
+                totalOnline,
+                today
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'Something went wrong. Please try again.',
+            status: 500,
+            success: false,
+            error: error.message
+        });
+    }
 }
 
 exports.completeConsultation = async (req, res) => {

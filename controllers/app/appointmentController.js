@@ -114,7 +114,7 @@ exports.createAppointment = async (req, res) => {
             patientName,
             age,
             gender,
-            phone: `+91${phone}`,
+            phone: phone,
             painNotes,
             amount,
             otp: Number(generateRandomOTP()),
@@ -398,6 +398,28 @@ exports.createAppointmentRazorpay = async (req, res) => {
             status: 400
         });
 
+
+        if (patient && appointmentAddress) {
+            // Update the patient document with the new appointment address
+            if (patient.appointmentAddress !== appointmentAddress.toString()) {
+                patient.appointmentAddress = appointmentAddress;
+            }
+
+            // Check if address already exists in patientAddresses
+            let isAddressExists = patient.patientAddresses.some((entry) => {
+                return entry.appointmentAddress === appointmentAddress.toString();
+            });
+
+            // If not, push the new address
+            if (!isAddressExists) {
+                patient.patientAddresses.push({
+                    appointmentAddress: appointmentAddress.toString()
+                });
+            }
+
+            await patient.save();
+        }
+
         if (isRazorpay == false || isRazorpay == "false") {
             const appointment = new Appointment({
                 patientId,
@@ -408,7 +430,7 @@ exports.createAppointmentRazorpay = async (req, res) => {
                 age,
                 gender,
                 paymentMode: 'online',
-                phone: `+91${phone}`,
+                phone: phone,
                 painNotes,
                 amount,
                 otp: Number(generateRandomOTP()),
@@ -419,27 +441,6 @@ exports.createAppointmentRazorpay = async (req, res) => {
 
             try {
                 await appointment.save(); // Save the appointment
-
-                if (patient && appointmentAddress) {
-                    // Update the patient document with the new appointment address
-                    if (patient.appointmentAddress !== appointmentAddress.toString()) {
-                        patient.appointmentAddress = appointmentAddress;
-                    }
-
-                    // Check if address already exists in patientAddresses
-                    let isAddressExists = patient.patientAddresses.some((entry) => {
-                        return entry.appointmentAddress === appointmentAddress.toString();
-                    });
-
-                    // If not, push the new address
-                    if (!isAddressExists) {
-                        patient.patientAddresses.push({
-                            appointmentAddress: appointmentAddress.toString()
-                        });
-                    }
-
-                    await patient.save();
-                }
 
                 // Send Notification to physio and patient
                 if (physio && patient) {
@@ -616,7 +617,7 @@ exports.createAppointmentRazorpay = async (req, res) => {
                 patientName,
                 age,
                 gender,
-                phone: `+91${phone}`,
+                phone: phone,
                 painNotes,
                 amount,
                 couponId: couponId ? couponId : null,
