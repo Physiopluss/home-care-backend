@@ -109,9 +109,6 @@ exports.AllPhysio = async (req, res) => {
             perPage = 10,
             cache = false
         } = req.query;
-
-        console.log(req.query);
-
         const currentPage = parseInt(page);
         const limit = parseInt(perPage);
         const skip = (currentPage - 1) * limit;
@@ -156,6 +153,16 @@ exports.AllPhysio = async (req, res) => {
             }
         }
 
+        if (freePhysio) {
+            switch (freePhysio) {
+                case "approved":
+                    query.accountStatus = 1
+                    break;
+                case "unApproved": query.accountStatus = 0
+                default:
+                    break;
+            }
+        }
         // Aggregation pipeline
         const aggregationPipeline = [
             { $match: query },

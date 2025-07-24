@@ -26,10 +26,12 @@ const AppRouter = require('./app-router');
 const AdminRouter = require('./admin-routers');
 const PhysioRouter = require('./physio-routers');
 const CommonRouter = require('./common-router');
+const WebsiteRouter = require('./website-routers')
 
 AppRouter(app);
 AdminRouter(app);
 PhysioRouter(app);
+WebsiteRouter(app);
 CommonRouter(app);
 
 // Connect DB and start server
