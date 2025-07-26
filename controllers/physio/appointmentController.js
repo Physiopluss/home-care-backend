@@ -81,7 +81,16 @@ exports.getPhysioAppointments = async (req, res) => {
         if (isTreatmentCompleted !== undefined && isTreatmentCompleted !== null && isTreatmentCompleted !== '') {
             query["isTreatmentScheduled.isTreatmentCompleted"] = isTreatmentCompleted === "true" || isTreatmentCompleted === true;
         }
-        const appointments = await Appointment.find(query).lean();
+        const appointments = await Appointment.find(query).populate({
+            path: 'physioId',
+            populate: [
+                { path: 'specialization', model: 'Specialization' },
+                { path: 'subscriptionId', model: 'Subscription' },
+                { path: 'degree.degreeId', model: 'Degree' },
+                { path: 'bptDegree.degreeId', model: 'Degree' },
+                { path: 'mptDegree.degreeId', model: 'Degree' }
+            ]
+        }).populate('patientId');
 
         return res.status(200).json({
             success: true,
@@ -199,15 +208,16 @@ exports.getTodayAppointments = async (req, res) => {
                 $gte: startDay,
                 $lte: endDay
             }
-        }).populate('patientId')
-            .populate({
-                path: 'physioId',
-                populate: {
-                    path: 'specialization',
-                    model: 'Specialization'
-                }
-            })
-            .sort({ createdAt: -1 });
+        }).populate({
+            path: 'physioId',
+            populate: [
+                { path: 'specialization', model: 'Specialization' },
+                { path: 'subscriptionId', model: 'Subscription' },
+                { path: 'degree.degreeId', model: 'Degree' },
+                { path: 'bptDegree.degreeId', model: 'Degree' },
+                { path: 'mptDegree.degreeId', model: 'Degree' }
+            ]
+        }).sort({ createdAt: -1 });
 
         return res.status(200).json({
             message: 'Appointments fetched successfully',

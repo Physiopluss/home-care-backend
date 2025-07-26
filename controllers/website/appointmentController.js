@@ -778,13 +778,16 @@ exports.getAppointmentByPhysioId = async (req, res) => {
             })
         }
 
-        const appointments = await Appointment.find({ physioId })
-            .populate('patientId physioId couponId')
-            .populate({
-                path: 'physioId',
-                populate: { path: 'specialization' }
-            });
-
+        const appointments = await Appointment.find({ physioId }).populate({
+            path: 'physioId',
+            populate: [
+                { path: 'specialization', model: 'Specialization' },
+                { path: 'subscriptionId', model: 'Subscription' },
+                { path: 'degree.degreeId', model: 'Degree' },
+                { path: 'bptDegree.degreeId', model: 'Degree' },
+                { path: 'mptDegree.degreeId', model: 'Degree' }
+            ]
+        }).populate('patientId');
         const modifiedAppointments = await Promise.all(
             appointments.map(async (apt) => {
                 const aptObj = apt.toObject(); // convert to plain JS object

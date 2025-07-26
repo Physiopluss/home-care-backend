@@ -2684,34 +2684,16 @@ exports.singleAppointment = async (req, res) => {
     try {
         const appointmentId = req.query.appointmentId;
 
-        const appointment = await Appointment.findById(appointmentId)
-            .populate('physioId patientId')
-            .populate({
-                path: 'physioId',
-                populate: [
-                    {
-                        path: 'specialization',
-                        model: 'Specialization'
-                    },
-                    {
-                        path: 'degree.degreeId',
-                        model: 'Degree'
-                    },
-                    {
-                        path: 'bptDegree.degreeId',
-                        model: 'Degree'
-                    },
-                    {
-                        path: 'mptDegree.degreeId',
-                        model: 'Degree'
-                    },
-                    {
-                        path: 'subscriptionId',
-                        model: 'Subscription'
-                    },
-                ]
-            });
-
+        const appointment = await Appointment.findById(appointmentId).populate({
+            path: 'physioId',
+            populate: [
+                { path: 'specialization', model: 'Specialization' },
+                { path: 'subscriptionId', model: 'Subscription' },
+                { path: 'degree.degreeId', model: 'Degree' },
+                { path: 'bptDegree.degreeId', model: 'Degree' },
+                { path: 'mptDegree.degreeId', model: 'Degree' }
+            ]
+        }).populate('patientId');
         if (!appointment) {
             return res.status(404).json({
                 message: "Appointment not found",
