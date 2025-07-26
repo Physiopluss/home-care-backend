@@ -1186,10 +1186,10 @@ exports.getPhysioById = async (req, res) => {
                 }
             });
         if (!physio) {
-            return res.json({
+            return res.status(404).json({
                 status: false,
                 message: `Physio not found ${id}`,
-                status: 400,
+                status: 404,
                 id: id
             });
         }

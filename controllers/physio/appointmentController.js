@@ -47,7 +47,12 @@ const msg91otp = new msg91OTP({
 
 exports.getPhysioAppointments = async (req, res) => {
     try {
-        const { physioId, appointmentStatus, appointmentCompleted, isTreatmentCompleted } = req.query;
+        const {
+            physioId,
+            appointmentStatus,
+            appointmentCompleted,
+            isTreatmentCompleted
+        } = req.query;
 
         // Validate physioId as a valid ObjectId
         if (!mongoose.Types.ObjectId.isValid(physioId)) {
@@ -57,7 +62,7 @@ exports.getPhysioAppointments = async (req, res) => {
                 status: 400
             });
         }
-        // console.log("physioId", physioId);
+
         const physio = await Physio.findById(physioId);
         if (!physio) {
             return res.status(401).json({
@@ -67,35 +72,19 @@ exports.getPhysioAppointments = async (req, res) => {
             });
         }
 
-        console.log(req.query);
+        console.log("Incoming query params:", req.query);
 
-        // Special case when appointmentStatus is 25
-        // if (appointmentStatus == 25) {
-        //     const appointments = await Appointment.find({
-        //         physioId,
-        //         appointmentCompleted: true
-        //     }).populate('patientId physioId')
-        //         .populate({
-        //             path: 'physioId',
-        //             populate: {
-        //                 path: 'specialization',
-        //                 model: 'Specialization'
-        //             }
-        //         })
-        //     return res.status(200).json({
-        //         message: 'Appointments fetched',
-        //         success: true,
-        //         status: 200,
-        //         data: appointments
-        //     });
-        // }
-        // Fetch appointments based on constructed query
-        const appointments = await Appointment.find({
+        // Build query with proper default values
+        const query = {
             physioId,
-            ...(appointmentStatus ? { appointmentStatus: parseInt(appointmentStatus) } : {}),
-            ...(appointmentCompleted ? { appointmentCompleted: appointmentCompleted } : {}),
-            ...(isTreatmentCompleted ? { "isTreatmentScheduled.isTreatmentCompleted": isTreatmentCompleted } : {})
-        }).populate('patientId')
+            appointmentStatus: appointmentStatus ? parseInt(appointmentStatus) : 0,
+            appointmentCompleted: appointmentCompleted === "true" || appointmentCompleted === true ? true : false,
+            "isTreatmentScheduled.isTreatmentCompleted":
+                isTreatmentCompleted === "true" || isTreatmentCompleted === true ? true : false
+        };
+
+        const appointments = await Appointment.find(query)
+            .populate('patientId')
             .populate({
                 path: 'physioId',
                 populate: {
@@ -105,6 +94,8 @@ exports.getPhysioAppointments = async (req, res) => {
             })
             .sort({ createdAt: -1 });
 
+        console.log("Fetched appointments:", appointments.length);
+
         return res.status(200).json({
             message: 'Appointments fetched',
             success: true,
@@ -113,6 +104,7 @@ exports.getPhysioAppointments = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Error fetching appointments:", error);
         res.status(500).json({
             message: 'Something went wrong, please try again',
             success: false,

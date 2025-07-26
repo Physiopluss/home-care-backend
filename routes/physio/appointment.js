@@ -6,7 +6,7 @@ router.post('/completeAppointment', appointmentController.completeAppointment);
 router.post('/completeTreatment', appointmentController.completeTreatment);
 router.post('/cashAppointment', appointmentController.cashAppointmentPayment);
 router.get('/getAppointmentsStatus', appointmentController.getAppointmentsStatus);
-router.get('/getTodayAppointment', appointmentController.getTodayAppointments);
+router.get('/get-today-appointment', appointmentController.getTodayAppointments);
 router.get('/getAppointmentCompleted', appointmentController.getAppointmentComplete);
 
 router.post('/debit-physio-amount', appointmentController.debitPhysioAmount);
